@@ -1,0 +1,70 @@
+/* 与「口语评测」一致的页面容器：居中、最大宽度 1200px */
+.page-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.page-header {
+  margin-bottom: 16px;
+}
+
+.page-title-with-icon {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 8px;
+  font-size: 24px;
+  font-weight: 600;
+  color: #1f1f1f;
+  line-height: 1.2;
+}
+
+.page-title-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.page-title-text {
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.page-header h1:not(.page-title-with-icon) {
+  margin: 0 0 8px;
+  font-size: 24px;
+  font-weight: 600;
+  color: #1f1f1f;
+}
+
+.page-header .subtitle {
+  color: #666;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.page-header--toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.page-header--toolbar .page-header-main {
+  flex: 1;
+  min-width: 200px;
+}
+
+.page-section {
+  margin-bottom: 16px;
+}

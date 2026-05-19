@@ -1,0 +1,1002 @@
+[
+  {
+    "prompt": "How do you spend your free time?",
+    "expectedAnswer": "-",
+    "modelOutput": "Hey there! I like to spend my free time exploring new things, like reading interesting books, going for walks, or even playing a fun game. It really depends on how I'm feeling."
+  },
+  {
+    "prompt": "Do you like sports?",
+    "expectedAnswer": "-",
+    "modelOutput": "I think sports are great! They help keep us healthy, build teamwork skills, and can be really fun to watch or play. Do you have a favorite sport?"
+  },
+  {
+    "prompt": "Do you have much time on sports?",
+    "expectedAnswer": "-",
+    "modelOutput": "Sure, I’ve got time to chat right now! What would you like to talk about, or is there something specific you want to ask me?"
+  },
+  {
+    "prompt": "What is the most popular sport in China?",
+    "expectedAnswer": "-",
+    "modelOutput": "The most popular sport in China is basketball. Millions of people love to play and watch it, and the Chinese Basketball Association is hugely popular. Soccer and table tennis are also widely enjoyed."
+  },
+  {
+    "prompt": "What's your hobby?",
+    "expectedAnswer": "-",
+    "modelOutput": "Oh, I love reading adventure stories and exploring nature trails whenever I get the chance. It’s so fun to discover new things out there!"
+  },
+  {
+    "prompt": "Are you interested in watching TV?",
+    "expectedAnswer": "-",
+    "modelOutput": "I do find TV interesting! TV shows can have lots of cool stories, fun characters, and even teach us new facts. What kind of shows do you like to watch?"
+  },
+  {
+    "prompt": "Are you interested in playing computer games?",
+    "expectedAnswer": "-",
+    "modelOutput": "Yeah, I do find computer games really interesting! They're a fun way to explore different worlds and solve challenges. What kind of games are you into?"
+  },
+  {
+    "prompt": "Who is your favorite singer?",
+    "expectedAnswer": "-",
+    "modelOutput": "I don’t really have a personal favorite singer. But I can tell you about popular artists in different genres, like Taylor Swift for pop or Bruno Mars for R&B. Who’s your favorite?"
+  },
+  {
+    "prompt": "What is your favorite color?",
+    "expectedAnswer": "-",
+    "modelOutput": "My favorite color is blue, because it's calm and reminds me of the sky and the ocean. It's a color that can feel peaceful and bright at the same time."
+  },
+  {
+    "prompt": "Which subject do you like best?",
+    "expectedAnswer": "-",
+    "modelOutput": "Hmm, that's a great question! I really enjoy science, because it helps us understand how the world works and sparks curiosity. What about you—do you have a favorite subject?"
+  },
+  {
+    "prompt": "How do you go to school every week?",
+    "expectedAnswer": "-",
+    "modelOutput": "I usually take the bus to school each week. Sometimes, I might also walk or get a ride from my family, depending on the weather and the distance."
+  },
+  {
+    "prompt": "Do you have a lot of homework to do every day?",
+    "expectedAnswer": "-",
+    "modelOutput": "Well, I understand how it feels to have homework every day. Many students do get assignments regularly, but it can vary by school and grade level. The key is to stay organized and plan your time well, so it doesn’t feel overwhelming."
+  },
+  {
+    "prompt": "How many subjects do you have?",
+    "expectedAnswer": "-",
+    "modelOutput": "It really depends on the school and the grade level, but typically middle school students have around 5 to 7 core subjects. Those usually include math, science, language arts, social studies, and sometimes foreign language or electives like art or music."
+  },
+  {
+    "prompt": "Do you think you are a good student?",
+    "expectedAnswer": "-",
+    "modelOutput": "Well, that really depends on how you define a good student. Being a good student isn’t just about getting perfect grades. It’s also about trying your best, learning from mistakes, and staying curious."
+  },
+  {
+    "prompt": "What do you think of your school? Why?",
+    "expectedAnswer": "-",
+    "modelOutput": "I think it can really depend on the person and their experiences. Some people love their school because of the friends they make or the activities they do, while others might find it a bit challenging. Overall, school is a place where you learn, grow, and figure out what you enjoy."
+  },
+  {
+    "prompt": "Can you say something about your class?",
+    "expectedAnswer": "-",
+    "modelOutput": "Sure! My class is a group of curious middle school students who love exploring new subjects. We work together, ask lots of questions, and help each other learn in fun and creative ways."
+  },
+  {
+    "prompt": "Are you interested in English?",
+    "expectedAnswer": "-",
+    "modelOutput": "Yes, I'm definitely interested in English! It's a really important language all around the world, and there's always something new and exciting to learn, whether it's a cool expression or a fun story."
+  },
+  {
+    "prompt": "Is the world being warmer and warmer now?",
+    "expectedAnswer": "-",
+    "modelOutput": "Yes, the world is getting warmer. Scientists have found that the global temperature is rising because of greenhouse gases, like carbon dioxide, from human activities. This is leading to climate change and affecting weather patterns around the world."
+  },
+  {
+    "prompt": "What do you think of our environment, is it good or not good? Why?",
+    "expectedAnswer": "-",
+    "modelOutput": "Well, our environment has some good parts and some not so good parts. The good part is we have beautiful nature and many resources. But the bad part is, pollution and climate change are causing a lot of harm. That’s why taking care of it is really important."
+  },
+  {
+    "prompt": "What can we do to make our city nice and clean?",
+    "expectedAnswer": "-",
+    "modelOutput": "One simple but powerful thing is to always throw trash in the proper bins and recycle when we can. We can also organize community clean-up days and encourage our friends and family to keep public spaces clean."
+  },
+  {
+    "prompt": "Do you like mountains?",
+    "expectedAnswer": "-",
+    "modelOutput": "Hey there! Yes, I do like mountains. They're beautiful, full of adventure, and a great place to explore nature. What about you?"
+  },
+  {
+    "prompt": "Do you often go to the zoo?",
+    "expectedAnswer": "-",
+    "modelOutput": "Yeah, I do enjoy going to the zoo from time to time. It’s fun to see all the animals and learn about their habitats. How about you—do you have a favorite animal you like to visit there?"
+  },
+  {
+    "prompt": "What animals do you like best?",
+    "expectedAnswer": "-",
+    "modelOutput": "I really love sea otters. They’re super playful, smart, and they use tools like rocks to open shells. Plus, they look really cute floating on their backs!"
+  },
+  {
+    "prompt": "Have you ever been to any place of interest in our country?",
+    "expectedAnswer": "-",
+    "modelOutput": "I haven't personally traveled anywhere, but I do know about many interesting places in your country. For example, there might be famous landmarks, museums, or natural wonders that many visitors would love to see. If you tell me more about what you find interesting, I can share some cool facts!"
+  },
+  {
+    "prompt": "Could you tell me about some beautiful places to visit in Beijing?",
+    "expectedAnswer": "-",
+    "modelOutput": "Sure! One beautiful place is the Summer Palace, with its lovely lake and pavilions. Another must-see is the Forbidden City, full of ancient architecture and history. And don’t miss the Great Wall nearby for breathtaking views!"
+  },
+  {
+    "prompt": "By the way, do you have any plan about your coming holiday?Where are you planning to go?",
+    "expectedAnswer": "-",
+    "modelOutput": "Hey, thanks for asking! Actually, I haven't made any solid plans yet for the holiday. I'm thinking about maybe going on a little road trip to the mountains, or visiting some family. I'll probably decide soon and figure it all out."
+  },
+  {
+    "prompt": "What do you think of music?",
+    "expectedAnswer": "-",
+    "modelOutput": "Music is amazing! It can make us feel all kinds of emotions, help us relax, or even get us pumped up and ready to go. It's like a universal language that connects people all over the world."
+  },
+  {
+    "prompt": "What are you going to do this weekend?",
+    "expectedAnswer": "-",
+    "modelOutput": "I'm planning to have a relaxing weekend, maybe go for a nice walk outside, read a good book, and catch up with some friends. Nothing too big, just enjoying some calm time."
+  },
+  {
+    "prompt": "Are you going to watch TV tonight?",
+    "expectedAnswer": "-",
+    "modelOutput": "I might watch a little TV tonight, maybe an interesting show or a cool documentary. How about you? Are you planning to watch something fun?"
+  },
+  {
+    "prompt": "Do you make a plan when new school year begins?",
+    "expectedAnswer": "-",
+    "modelOutput": "That's a great question! At the start of a new school year, it's really helpful to make a simple plan. You can set some goals, decide on a routine, and maybe pick a time for homework. That way, you stay organized and ready to learn."
+  },
+  {
+    "prompt": "What do you want to be when you grow up?",
+    "expectedAnswer": "-",
+    "modelOutput": "That’s a great question! When I think about it, I’d probably love to be someone who helps others learn, maybe a teacher or a guide. I enjoy explaining things and making tough ideas easier to understand."
+  },
+  {
+    "prompt": "How to make our dream come true?",
+    "expectedAnswer": "-",
+    "modelOutput": "That's a great question! To make your dream come true, you need to set clear goals and take small steps every day. Staying focused and believing in yourself is super important too."
+  },
+  {
+    "prompt": "What' s the weather like in Beijing' s winter?",
+    "expectedAnswer": "-",
+    "modelOutput": "In Beijing’s winter, the weather is usually quite cold and dry, often with temperatures below freezing. You can expect a lot of clear days, but it can also be windy and sometimes there’s a bit of snow."
+  },
+  {
+    "prompt": "Do you like spring?Why?",
+    "expectedAnswer": "-",
+    "modelOutput": "Yeah, I really like spring! It’s a time when everything wakes up—flowers bloom, trees get green, and the weather gets warmer. Plus, all the animals start coming out, and it feels full of life and energy."
+  },
+  {
+    "prompt": "How many seasons in Yunnan in a year?",
+    "expectedAnswer": "-",
+    "modelOutput": "There are four seasons in a year: spring, summer, autumn, and winter. Each season has its own weather and typical changes in nature."
+  },
+  {
+    "prompt": "Does it often snow in Hainan?",
+    "expectedAnswer": "-",
+    "modelOutput": "在海南，一般是不会下雪的。因为海南属于热带和亚热带气候，冬季也很温暖，气温很少降到很低的程度，所以基本上不会有降雪的情况。"
+  },
+  {
+    "prompt": "What's your favorite season?Why?",
+    "expectedAnswer": "-",
+    "modelOutput": "I really love autumn, because the weather gets cooler, the leaves turn beautiful colors, and there’s a cozy feeling in the air. Plus, it’s a great time for fun activities like pumpkin picking and wearing comfy sweaters."
+  },
+  {
+    "prompt": "Do you like rainy days?",
+    "expectedAnswer": "-",
+    "modelOutput": "I think rainy days can be really cozy. The sound of the rain can be relaxing, and it’s a great time to read, draw, or just enjoy some quiet at home."
+  },
+  {
+    "prompt": "How can you know the weather?",
+    "expectedAnswer": "-",
+    "modelOutput": "Great question! You can check the weather by looking at a weather app, listening to a weather forecast, or even noticing clues outside, like the clouds or the wind. Usually, checking a trusted weather service gives the most accurate details."
+  },
+  {
+    "prompt": "What's the temperature today?",
+    "expectedAnswer": "-",
+    "modelOutput": "Today’s temperature is around 72 degrees Fahrenheit, which is pretty mild and comfortable. It might feel a little warmer in the sun."
+  },
+  {
+    "prompt": "Do you think you are a happy boy or girl? Why?",
+    "expectedAnswer": "-",
+    "modelOutput": "I think how happy someone feels depends a lot on their mindset and experiences. It’s not really about being a boy or a girl, but about how you see and deal with things in life. Being grateful and finding joy in small moments can make a big difference."
+  },
+  {
+    "prompt": "Will you get angry if your friend cheat you? Why?",
+    "expectedAnswer": "-",
+    "modelOutput": "That's a great question. You might feel angry if your friend lies because trust is really important in friendships. When someone breaks that trust, it can hurt your feelings and make you question if they respect and value you."
+  },
+  {
+    "prompt": "Are you happy today?",
+    "expectedAnswer": "-",
+    "modelOutput": "I'm glad you asked! Yes, I'm feeling bright and cheerful today. How about you?"
+  },
+  {
+    "prompt": "How are you getting on with your classmates?",
+    "expectedAnswer": "-",
+    "modelOutput": "I'm getting along pretty well with my classmates. We work together on projects, and I'm making some good friends. Of course, there are little disagreements sometimes, but overall it’s going great."
+  },
+  {
+    "prompt": "How do you relieve yourself when you are in a bad mood?",
+    "expectedAnswer": "-",
+    "modelOutput": "When I'm in a bad mood, I like to take a few deep breaths and maybe go for a quick walk or listen to some calming music. That helps me clear my mind and reset my mood before I get back to what I need to do."
+  },
+  {
+    "prompt": "What would you do if you had a problem with a friend?",
+    "expectedAnswer": "-",
+    "modelOutput": "It's totally normal to have disagreements with friends sometimes. The best thing to do is to talk openly and calmly with them, listening to their side and sharing how you feel. That way, you can try to find a solution together."
+  },
+  {
+    "prompt": "Would you forgive your friend if he lied to you?",
+    "expectedAnswer": "-",
+    "modelOutput": "그럴 때는 먼저 깊게 숨을 쉬고 차분하게 마음을 가라앉혀 보는 게 좋아. 그리고 친구에게 솔직하게 네가 느낀 감정을 말해보면 어떨까? 그 뒤에 그 친구가 왜 그랬는지 들어보고, 서로 이해하려고 노력하다 보면 용서하는 마음도 조금씩 생기지 않을까 싶어."
+  },
+  {
+    "prompt": "Are you a sensible or an emotional person?",
+    "expectedAnswer": "-",
+    "modelOutput": "那要看情况哦。有时候我会理性分析，帮助你理解事实；有时候也会理解情绪，陪你一起分享感受。总之，我会根据你的需要来调整。"
+  },
+  {
+    "prompt": "Do you have much communication with your family? What do you often talk about?",
+    "expectedAnswer": "-",
+    "modelOutput": "We usually share how our day went, funny moments we had, or even discuss upcoming plans and ideas. We also talk about any challenges we're facing and give each other advice or encouragement."
+  },
+  {
+    "prompt": "How do you feel about good lies?",
+    "expectedAnswer": "-",
+    "modelOutput": "That's a great question! Cold ice can feel really refreshing on a hot day, and people often enjoy how it cools them down. It can also be fun to hold or even skate on!"
+  },
+  {
+    "prompt": "What's your favorite holiday?",
+    "expectedAnswer": "-",
+    "modelOutput": "That’s a fun question! My favorite holiday is probably New Year's Eve, because it’s a time to celebrate with friends and family, reflect on the past year, and look forward to new beginnings."
+  },
+  {
+    "prompt": "Can you tell me about traditional customs during the Spring Festival?",
+    "expectedAnswer": "-",
+    "modelOutput": "Sure! One important tradition is families gathering for a big reunion dinner on New Year's Eve, enjoying special dishes like dumplings or fish that symbolize good luck. People also set off firecrackers to scare away bad spirits and bring in a joyful atmosphere for the year ahead."
+  },
+  {
+    "prompt": "How do you celebrate New Year's Day?",
+    "expectedAnswer": "-",
+    "modelOutput": "We usually celebrate New Year’s Day by gathering with family or friends, watching fireworks, and counting down to midnight. Some people make resolutions or set goals for the new year. The key is to have fun and share good wishes for the year ahead."
+  },
+  {
+    "prompt": "What kind of food do you enjoy eating during the Dragon Boat Festival?",
+    "expectedAnswer": "-",
+    "modelOutput": "I love eating zongzi during the Dragon Boat Festival. They’re these delicious sticky rice dumplings wrapped in bamboo leaves, often with savory or sweet fillings. The combination of the fragrant leaves and the tasty rice makes them really special."
+  },
+  {
+    "prompt": "Can you tell me about a special tradition for the Dragon Boat Festival?",
+    "expectedAnswer": "-",
+    "modelOutput": "Sure! The Dragon Boat Festival, also called Duanwu Festival, is known for its exciting dragon boat races. People paddle in long, colorful boats, beating drums in rhythm. Another important part is eating sticky rice dumplings called zongzi, to honor the ancient poet Qu Yuan."
+  },
+  {
+    "prompt": "What's the meaning behind the Mid-Autumn Festival?",
+    "expectedAnswer": "-",
+    "modelOutput": "The Mid-Autumn Festival is a traditional holiday celebrated mainly in East Asia. It’s all about family reunions, admiring the full moon, and giving thanks for the harvest. People often eat mooncakes and spend time with loved ones."
+  },
+  {
+    "prompt": "What do you think is the best gift to give someone on Children's Day?",
+    "expectedAnswer": "-",
+    "modelOutput": "That's a great question! A fun and thoughtful gift could be something creative, like art supplies or a cool book. Something that sparks imagination and joy can make Children's Day really special."
+  },
+  {
+    "prompt": "How do you show respect to the elderly on the Double Ninth Festival?",
+    "expectedAnswer": "-",
+    "modelOutput": "在重阳节，也就是重九节，我们通常可以通过登高、拜访长辈、给他们送上一些健康的礼物，或者陪他们聊聊天，表达关心和敬意。"
+  },
+  {
+    "prompt": "Have you ever celebrated Christmas? If so, what are some things you like about it?",
+    "expectedAnswer": "-",
+    "modelOutput": "Sure, I have experienced Christmas celebrations! One of the things I really like is the warm, joyful atmosphere—people decorating, sharing gifts, and enjoying time together. And the food and music can be really fun too."
+  },
+  {
+    "prompt": "How do you think holidays have changed over the years?",
+    "expectedAnswer": "-",
+    "modelOutput": "Holidays have changed in some cool ways. People might celebrate with new technology now, like sharing photos online or using video calls. Also, some traditions get updated as new generations bring in fresh ideas."
+  },
+  {
+    "prompt": "What's your favorite way of travelling?",
+    "expectedAnswer": "-",
+    "modelOutput": "My favorite way of traveling is by train. I love looking out the window at the scenery rolling by, and it's usually very comfortable and relaxing."
+  },
+  {
+    "prompt": "Do you enjoy travelling?",
+    "expectedAnswer": "-",
+    "modelOutput": "Yeah, I really enjoy traveling! It’s fun to explore new places, learn about different cultures, and try new foods. Every trip can be a great adventure."
+  },
+  {
+    "prompt": "What should you prepare before travelling?",
+    "expectedAnswer": "-",
+    "modelOutput": "Great question! Before traveling, you should prepare your important documents, like your passport or ID, pack clothes suited for the weather, and bring any chargers or travel adapters you might need. It’s also helpful to have a small first-aid kit and a plan for your itinerary."
+  },
+  {
+    "prompt": "Have you ever been to Hainan?",
+    "expectedAnswer": "-",
+    "modelOutput": "嗨！海南是一个非常美丽的地方，有温暖的气候、沙滩和海鲜。如果你有机会去那儿，肯定能享受到阳光和大海的美好，很多人都觉得那是旅游度假的好去处。"
+  },
+  {
+    "prompt": "How do you like Changsha? Why?",
+    "expectedAnswer": "-",
+    "modelOutput": "我觉得长沙很有意思，它有丰富的历史文化，还有特别有名的小吃，像臭豆腐和糖油粑粑。另外，城市的夜景和热情的人也让人印象深刻。"
+  },
+  {
+    "prompt": "Have you ever traveled alone? If so, how was the experience?",
+    "expectedAnswer": "-",
+    "modelOutput": "Yes, I have traveled alone, and the experience was both exciting and a bit challenging. It gave me a lot of independence and confidence because I had to figure things out on my own, but it could also feel a little lonely at times."
+  },
+  {
+    "prompt": "What's the most interesting place you've ever visited?",
+    "expectedAnswer": "-",
+    "modelOutput": "One of the most interesting places I’ve ever visited is an ancient city with enormous stone temples, surrounded by lush jungle. Exploring those ruins made me feel connected to history in a way I’d never felt before."
+  },
+  {
+    "prompt": "How do you choose where to stay when you travel?",
+    "expectedAnswer": "-",
+    "modelOutput": "That’s a great question! Usually, people choose where to stay by considering their budget, how close it is to the places they want to visit, and what kind of amenities they need, like free breakfast or a pool. They might also read reviews from other travelers to find a good fit."
+  },
+  {
+    "prompt": "Do you make a list of things to do before you go on a trip?",
+    "expectedAnswer": "-",
+    "modelOutput": "Sure thing! Before you go on your trip, here are some key things to get done: Pack your clothes and essentials, check your travel documents like your ID or passport, and confirm your transportation and accommodation details. That should set you up for a smooth and fun journey!"
+  },
+  {
+    "prompt": "Do you take a camera with you when you travel?",
+    "expectedAnswer": "-",
+    "modelOutput": "Good question! Yes, I usually do like to take a camera when I travel. It helps me capture special moments and beautiful places so I can remember them later."
+  },
+  {
+    "prompt": "How many languages can you speak?",
+    "expectedAnswer": "-",
+    "modelOutput": "I can speak many languages—over 20 of them! For example, I can speak English, Spanish, French, German, Chinese, Arabic, Japanese, Russian, Portuguese, and many more. I can also use different accents or dialects if you want."
+  },
+  {
+    "prompt": "How do you learn foreign language?",
+    "expectedAnswer": "-",
+    "modelOutput": "Learning a foreign language takes time and practice. The best way is to immerse yourself by listening, speaking, reading, and writing a little bit every day. You can use language apps, watch videos, and practice with native speakers to improve over time."
+  },
+  {
+    "prompt": "How long have you been studying English?",
+    "expectedAnswer": "-",
+    "modelOutput": "I've been learning English for a long time, and I keep improving every day. How about you—how long have you been studying?"
+  },
+  {
+    "prompt": "Are you good at English?",
+    "expectedAnswer": "-",
+    "modelOutput": "Yes, I'm pretty good at English and I'm here to help you. We can practice together anytime you want and have fun learning."
+  },
+  {
+    "prompt": "What other languages do you want to learn?",
+    "expectedAnswer": "-",
+    "modelOutput": "我一直对日语、法语还有西班牙语很感兴趣。每一种语言都有独特的文化和表达方式，学习它们能让我更广泛地了解世界，也能和更多人交流。"
+  },
+  {
+    "prompt": "Do you find it difficult to learn new vocabulary?",
+    "expectedAnswer": "-",
+    "modelOutput": "Learning new vocabulary can be a bit tricky at first, but if you break it down and practice a little every day, it gets easier. Plus, using the words in real-life situations helps them stick in your memory."
+  },
+  {
+    "prompt": "What's the best way to memorize new words?",
+    "expectedAnswer": "-",
+    "modelOutput": "One great way is to use flashcards with pictures and examples, and review them a little bit each day. Also, try using the new words in sentences and stories to help them stick in your mind."
+  },
+  {
+    "prompt": "Do you have any way to practice speaking a new language?",
+    "expectedAnswer": "-",
+    "modelOutput": "Absolutely! One great way is to try speaking out loud every day, even if it’s just describing what you’re doing. You can also record yourself and listen back, or find a language partner to practice with regularly. And don’t forget to have fun with it!"
+  },
+  {
+    "prompt": "What would you say if you wanted to ask someone for directions?",
+    "expectedAnswer": "-",
+    "modelOutput": "Sure! You could say something like, \"Excuse me, could you help me find the nearest library?\" or \"Do you know how to get to the museum from here?\" Just be polite and clear about the place you're trying to find."
+  },
+  {
+    "prompt": "How would you order food at a restaurant in English?",
+    "expectedAnswer": "-",
+    "modelOutput": "Sure! You can say something like: \"Hi, could I please get a cheeseburger and fries?\" or \"I'd like to order a bowl of soup and a salad, please.\" Just be polite, speak clearly, and don't forget to say \"thank you\"!"
+  },
+  {
+    "prompt": "What's the best way to stay healthy in your opinion?",
+    "expectedAnswer": "-",
+    "modelOutput": "Staying healthy is really about balance. Eating a variety of nutritious foods, staying active every day, and getting enough sleep can make a big difference. It's also important to listen to your body and take care of your mental health."
+  },
+  {
+    "prompt": "How often do you exercise?",
+    "expectedAnswer": "-",
+    "modelOutput": "I aim to exercise regularly, usually about three to four times a week. That helps keep me healthy and feeling good."
+  },
+  {
+    "prompt": "What's your favorite type of exercise?",
+    "expectedAnswer": "-",
+    "modelOutput": "Thanks for asking! My favorite type of exercise is probably something fun and active, like cycling or a game of basketball, because it helps me stay strong and energized while having a good time. How about you?"
+  },
+  {
+    "prompt": "Do you eat a healthy diet? What do you usually eat?",
+    "expectedAnswer": "-",
+    "modelOutput": "I do try to follow a balanced diet. I often eat things like fruits, vegetables, whole grains, and lean proteins. It’s important to have a variety of foods to get all the nutrients your body needs."
+  },
+  {
+    "prompt": "How many hours of sleep do you get each night?",
+    "expectedAnswer": "-",
+    "modelOutput": "I usually get about seven to eight hours of sleep each night. It's important to have enough rest so that I can be energetic and focused the next day. How about you?"
+  },
+  {
+    "prompt": "Is drinking tea every day good for our health?",
+    "expectedAnswer": "-",
+    "modelOutput": "Drinking tea every day can be quite beneficial for our health. Many teas are rich in antioxidants, which can help protect our cells and support the immune system. Just remember to watch out for added sugars or caffeine if you're sensitive to it."
+  },
+  {
+    "prompt": "How do you manage stress in your daily life?",
+    "expectedAnswer": "-",
+    "modelOutput": "That’s a great question. One way is to take a few deep breaths and try to focus on something positive. Also, doing something you enjoy, like a hobby or spending time outdoors, can really help reduce stress and make you feel better."
+  },
+  {
+    "prompt": "Do you think exercise is important for health?",
+    "expectedAnswer": "-",
+    "modelOutput": "Yes, exercise is really important for health because it helps keep your heart strong, your muscles fit, and your mind clear. Regular physical activity boosts energy levels and can even improve your mood."
+  },
+  {
+    "prompt": "How often should people visit the doctor for check-ups?",
+    "expectedAnswer": "-",
+    "modelOutput": "It's generally a good idea for people to have a regular check-up with their doctor once a year, even if they feel healthy. But for kids and older adults, or anyone with a health condition, they might need check-ups more often, like every six months."
+  },
+  {
+    "prompt": "How do you balance work or school with staying healthy?",
+    "expectedAnswer": "-",
+    "modelOutput": "That’s a great question! Balancing work or school with staying healthy means making time for things like regular exercise, eating balanced meals, and getting enough sleep. You can also take short breaks to stretch or relax throughout the day, so you stay refreshed and focused."
+  },
+  {
+    "prompt": "Do you prefer shopping in stores or online? Why?",
+    "expectedAnswer": "-",
+    "modelOutput": "That's a great question! I think both have their perks. Shopping in stores is fun because you can see and touch things directly, but online shopping is super convenient and lets you compare prices easily. It really depends on what you're looking for!"
+  },
+  {
+    "prompt": "What's your favorite thing to buy for yourself?",
+    "expectedAnswer": "-",
+    "modelOutput": "That's a fun question! My favorite thing to buy for myself is usually a good book or a new kind of snack I haven't tried before, because both let me experience something new and exciting."
+  },
+  {
+    "prompt": "How do you organize your home?",
+    "expectedAnswer": "-",
+    "modelOutput": "Organizing your home can be simple. You can sort your things into categories, give each item a specific place, and tidy up a little bit each day. This way, everything stays neat and easy to find."
+  },
+  {
+    "prompt": "How can you tell if vegetables are fresh at the grocery store?",
+    "expectedAnswer": "-",
+    "modelOutput": "Great question! You can check if vegetables are fresh by looking at their color, texture, and smell. Fresh veggies are usually bright, firm, and don’t have any mushy spots or bad odors."
+  },
+  {
+    "prompt": "What are some ways to save money while grocery shopping?",
+    "expectedAnswer": "-",
+    "modelOutput": "One great way to save money is to make a shopping list and stick to it, so you buy only what you need. Also, look for store brands or items on sale, and consider buying in bulk for things you use a lot."
+  },
+  {
+    "prompt": "What factors should you consider when buying a new phone?",
+    "expectedAnswer": "-",
+    "modelOutput": "Good question! When buying a new phone, think about the battery life, the camera quality, the storage capacity, and the processor speed. Also consider the operating system you prefer and your budget."
+  },
+  {
+    "prompt": "How do you decide between buying a new or used item?",
+    "expectedAnswer": "-",
+    "modelOutput": "That’s a great question! One big factor is budget—used items are often cheaper. Another thing to consider is condition: if you need something to last a long time and want a warranty, new might be better, but if you want to save money and it’s in good shape, used can be a great deal."
+  },
+  {
+    "prompt": "How can you avoid impulse purchases while shopping?",
+    "expectedAnswer": "-",
+    "modelOutput": "One good way to avoid impulse purchases is to make a shopping list before you go and stick to it. You can also wait 24 hours before buying something you didn’t plan for. That way, you give yourself time to think if it’s really something you need."
+  },
+  {
+    "prompt": "How do you know if a book is worth reading before buying it?",
+    "expectedAnswer": "-",
+    "modelOutput": "That’s a great question! One good way is to read the book’s summary and a few pages to see if the style and topic interest you. Also, checking reviews and recommendations can give you a good idea of whether it’ll be a good fit for you."
+  },
+  {
+    "prompt": "Do you know some ways to make my home more comfortable?",
+    "expectedAnswer": "-",
+    "modelOutput": "Sure! To make your home more comfortable, think about adding soft lighting like lamps or warm-toned bulbs, using cozy blankets and cushions, and arranging furniture to create inviting spaces for relaxing or spending time with others."
+  },
+  {
+    "prompt": "What subjects do you like best? Why?",
+    "expectedAnswer": "-",
+    "modelOutput": "I really enjoy science and history because science helps us understand how the world around us works, and history tells the amazing stories of people and events from the past. Both are full of interesting facts and discoveries that shape our world today."
+  },
+  {
+    "prompt": "Describe your daily schedule from morning to night.",
+    "expectedAnswer": "-",
+    "modelOutput": "Sure! Let me describe a typical daily schedule. In the morning, you might wake up around 7 a.m., brush your teeth, have breakfast, and get ready for school. During the day, you go to classes, maybe do some sports or activities. In the evening, you have dinner, finish homework, relax a bit, and then go to bed around 9 or 10 p.m."
+  },
+  {
+    "prompt": "What do you usually do during the break between classes?",
+    "expectedAnswer": "-",
+    "modelOutput": "During break time, it’s a good idea to relax a bit, maybe have a snack, chat with friends, or stretch your legs. Then you'll come back to class feeling refreshed and ready to learn more."
+  },
+  {
+    "prompt": "Who is your favorite teacher? What makes them special?",
+    "expectedAnswer": "-",
+    "modelOutput": "My favorite teacher was my 7th grade science teacher. They made every lesson fun and easy to understand, and they really listened to all of us, which made learning exciting and personal."
+  },
+  {
+    "prompt": "How do you prepare for exams?",
+    "expectedAnswer": "-",
+    "modelOutput": "Preparing for exams means starting early, breaking your study time into smaller chunks, and focusing on understanding the concepts. It also helps to practice with past questions and get enough rest before the test day."
+  },
+  {
+    "prompt": "If you could add a new club to your school, what would it be?",
+    "expectedAnswer": "-",
+    "modelOutput": "Oh, that’s a great question! I think I would add an invention or creativity club, where students can brainstorm cool ideas and build fun projects together. It would be a place to try out new things and learn by doing."
+  },
+  {
+    "prompt": "What is the most interesting school event you have attended?",
+    "expectedAnswer": "-",
+    "modelOutput": "One of the coolest schools I’ve seen is a floating school built on water in Bangladesh. It’s designed like a boat, with classrooms that can move with the water levels, keeping school open even when there’s heavy flooding."
+  },
+  {
+    "prompt": "Do you prefer studying alone or with classmates? Why?",
+    "expectedAnswer": "-",
+    "modelOutput": "Tentu, ini penjelasannya. Kecepatan itu sama dengan jarak dibagi waktu. Jadi, kalau kamu punya jarak yang ditempuh dan waktu yang dibutuhkan, tinggal bagi saja jarak per waktu, maka kamu dapat kecepatannya. Cukup sederhana, kan?"
+  },
+  {
+    "prompt": "What's your favorite place in your school?",
+    "expectedAnswer": "-",
+    "modelOutput": "My favorite place in my school is probably the library. It's a cozy spot with lots of books and a quiet vibe that helps me focus and relax. Plus, there’s always something new to learn in there."
+  },
+  {
+    "prompt": "What advice would you give to a new student in your school?",
+    "expectedAnswer": "-",
+    "modelOutput": "I’d say, be yourself, stay curious, and don’t be afraid to ask questions. Making new friends and trying different activities can help you feel more at home. And remember, it’s okay to take your time to adjust."
+  },
+  {
+    "prompt": "Introduce your family members and their jobs.",
+    "expectedAnswer": "-",
+    "modelOutput": "Sure! Let me give you an example: I have a sister who’s a doctor, and she works at a hospital. My brother is an engineer, and he designs bridges. And my mom is a teacher who teaches math."
+  },
+  {
+    "prompt": "What housework do you do at home?",
+    "expectedAnswer": "-",
+    "modelOutput": "Hi there! At home, I help out by doing chores like washing dishes, cleaning my room, and sometimes even vacuuming the floor. It's all about teamwork!"
+  },
+  {
+    "prompt": "Describe your favorite family activity.",
+    "expectedAnswer": "-",
+    "modelOutput": "Sure! The current scene shows a group of people outside on a wet, rainy day. They have umbrellas, and many are wearing raincoats. There's also a wheeled cart nearby with some boxes on it. It looks like they might have just come out of a building, and there's some sort of transport or delivery happening."
+  },
+  {
+    "prompt": "What do you usually eat for breakfast?",
+    "expectedAnswer": "-",
+    "modelOutput": "Well, a really good breakfast could have things like eggs, fruit, and whole-grain toast. Some people also enjoy yogurt or oatmeal for a balanced meal. It really depends on what you like and what makes you feel energized in the morning."
+  },
+  {
+    "prompt": "How do you celebrate birthdays in your family?",
+    "expectedAnswer": "-",
+    "modelOutput": "In my family, birthdays are usually celebrated with a homemade cake, singing happy birthday, and giving small gifts. We usually spend time together, share stories, and sometimes watch a favorite movie or play games as a family."
+  },
+  {
+    "prompt": "What time do you go to bed? Is it enough for you?",
+    "expectedAnswer": "-",
+    "modelOutput": "Great question! Usually, our family sets a budget first, depending on how long we’ll stay and the season. Then we compare different options online, looking at hotels, rentals, or deals. Ultimately, we choose something that fits both our needs and budget."
+  },
+  {
+    "prompt": "If you could change one rule at home, what would it be?",
+    "expectedAnswer": "-",
+    "modelOutput": "Hmm, that’s a good question! If I could change one rule at home, I might pick something like having a bit more flexibility around bedtime, so there’s a little extra time to relax or read."
+  },
+  {
+    "prompt": "What's the best gift you've ever received from your family?",
+    "expectedAnswer": "-",
+    "modelOutput": "¡Claro! La tradición más común suele ser la de reunirse para una gran comida o cena en familia. También muchos juegan a divertidos juegos de mesa, intercambian regalos, y en algunos lugares es común ver fuegos artificiales o escuchar música especial para celebrar."
+  },
+  {
+    "prompt": "Who do you talk to when you feel upset?",
+    "expectedAnswer": "-",
+    "modelOutput": "That's a great question! When you feel upset, it's really helpful to talk to someone you trust, like a parent, a teacher, or a good friend. Sharing your feelings with someone who cares about you can really help you feel better and find solutions."
+  },
+  {
+    "prompt": "What makes your hometown special?",
+    "expectedAnswer": "-",
+    "modelOutput": "Well, a special thing about many hometowns is that they have unique traditions, local foods, or special places that people are proud of. It could be a famous landmark, fun festivals, or even just the feeling of a close-knit community that makes it feel different and special."
+  },
+  {
+    "prompt": "What do you like to do in your free time?",
+    "expectedAnswer": "-",
+    "modelOutput": "Hello! In my free time, I really enjoy reading interesting books, exploring new technologies, and sometimes going for a nice walk outside. What about you? What kind of hobbies do you have?"
+  },
+  {
+    "prompt": "Do you prefer indoor or outdoor activities? Why?",
+    "expectedAnswer": "-",
+    "modelOutput": "Well, both indoor and outdoor activities have their perks. Indoor activities can be cozy and controlled, while outdoor activities give you fresh air, sunshine, and a chance to explore nature. Personally, I’d lean toward outdoor activities because they help you stay active and boost your mood."
+  },
+  {
+    "prompt": "What sport are you good at? How did you learn it?",
+    "expectedAnswer": "-",
+    "modelOutput": "구체적인 발열 온도는 보통 38도, 39도 정도를 발열이라고 해. 만약 40도까지 올라간다면 꽤 높은 편이라서 빨리 열을 내리고, 필요하면 병원에 가보는 게 좋아."
+  },
+  {
+    "prompt": "If you could learn a new skill, what would it be?",
+    "expectedAnswer": "-",
+    "modelOutput": "If I could learn a new skill, it would be playing a musical instrument, like the guitar or piano, because it’s a fun way to be creative and share music with others. Plus, it helps develop concentration and coordination."
+  },
+  {
+    "prompt": "Do you like reading books? What's your favorite book?",
+    "expectedAnswer": "-",
+    "modelOutput": "Hey! I do enjoy reading books. One of my favorites is \"Charlotte's Web\" because it's got such a wonderful story of friendship and kindness."
+  },
+  {
+    "prompt": "Describe a hobby you want to try in the future.",
+    "expectedAnswer": "-",
+    "modelOutput": "Huh, interesting question! One hobby I’d love to try in the future is archery. It seems really cool to practice focus and accuracy, and it would be fun to get good at hitting the target from a distance."
+  },
+  {
+    "prompt": "How much time do you spend on your hobbies every week?",
+    "expectedAnswer": "-",
+    "modelOutput": "Hey there! It really depends on my schedule, but usually I’d say I spend maybe a couple of hours a day on hobbies, so that ends up being around 10 to 14 hours a week. It can vary, though—some weeks more, some weeks less."
+  },
+  {
+    "prompt": "What kind of music do you enjoy? Who is your favorite singer?",
+    "expectedAnswer": "-",
+    "modelOutput": "I really enjoy listening to a variety of music, especially upbeat pop and rock songs. One of my favorite singers is Bruno Mars, because his music has great energy and he’s an amazing performer."
+  },
+  {
+    "prompt": "Do you like drawing or taking photos? Show an example.",
+    "expectedAnswer": "-",
+    "modelOutput": "Sure! I enjoy both drawing and taking photos. For example, I like drawing landscapes with trees and rivers, or taking photos of interesting buildings or flowers."
+  },
+  {
+    "prompt": "How do your hobbies help you relax?",
+    "expectedAnswer": "-",
+    "modelOutput": "That’s a great question! Hobbies help you relax by giving your mind a break from stress and letting you do something fun. They help calm you down and recharge your energy."
+  },
+  {
+    "prompt": "How do you celebrate the Spring Festival?",
+    "expectedAnswer": "-",
+    "modelOutput": "The Spring Festival, or Chinese New Year, is celebrated with lots of traditions. Families often gather for a big reunion dinner, set off fireworks, and give red envelopes with money for good luck. It’s a time full of joy, family, and wishing for prosperity in the new year."
+  },
+  {
+    "prompt": "What is your favorite traditional Chinese festival? Why?",
+    "expectedAnswer": "-",
+    "modelOutput": "My favorite traditional Chinese festival is the Mid-Autumn Festival, because it’s all about family reunion and admiring the full moon. People enjoy delicious mooncakes and share stories, making it a really warm and meaningful celebration."
+  },
+  {
+    "prompt": "Compare Mid-Autumn Festival and Christmas.",
+    "expectedAnswer": "-",
+    "modelOutput": "Sure! The Mid-Autumn Festival, mainly celebrated in East Asia, is about family reunions and mooncakes, focusing on the harvest and the full moon. Christmas, celebrated worldwide, is about joy, giving, and the birth of Jesus, with traditions like gifts and decorations."
+  },
+  {
+    "prompt": "Describe a memorable birthday party you attended.",
+    "expectedAnswer": "-",
+    "modelOutput": "Sure! I remember this awesome birthday party where we had a big outdoor picnic with colorful balloons everywhere, a huge cake shaped like a castle, and tons of fun games like a scavenger hunt. We even had a mini talent show, and everyone got a little prize. It was such a blast!"
+  },
+  {
+    "prompt": "Should schools organize more festival activities? Why?",
+    "expectedAnswer": "-",
+    "modelOutput": "Good question! Schools often organize more festival activities to help students learn about different cultures, have fun, and bring the whole school community together. It makes learning more enjoyable and helps everyone feel included."
+  },
+  {
+    "prompt": "What special food do people eat during the Dragon Boat Festival?",
+    "expectedAnswer": "-",
+    "modelOutput": "During the Dragon Boat Festival, people often eat zongzi, which are sticky rice dumplings wrapped in bamboo leaves. They can have various fillings, like sweet red bean or savory pork, and they’re a really important traditional food for this holiday."
+  },
+  {
+    "prompt": "How do you think festivals help families bond?",
+    "expectedAnswer": "-",
+    "modelOutput": "Festivals help families bond because they bring everyone together to share joy, traditions, and special moments. People cook, dance, and laugh together, creating strong memories and connections that can last a lifetime."
+  },
+  {
+    "prompt": "If you could create a new festival, what would it celebrate?",
+    "expectedAnswer": "-",
+    "modelOutput": "Hmm, that's a fun idea! If I could create a new festival, it might celebrate kindness and creativity. People could share stories, make art, and help each other out, bringing communities closer together."
+  },
+  {
+    "prompt": "Do you prefer traditional festivals or modern holidays? Why?",
+    "expectedAnswer": "-",
+    "modelOutput": "Interesting question! I like traditional festivals because they often have deep cultural stories and unique customs that bring people together in special ways. But I also enjoy modern holidays for their creativity and the way they evolve with new ideas."
+  },
+  {
+    "prompt": "What gift would you give to your best friend on their birthday?",
+    "expectedAnswer": "-",
+    "modelOutput": "Well, that depends on what your best friend likes! You could go for something personal like a homemade card or a framed photo of you two. Or maybe a fun shared experience, like tickets to an event or a cool game you both enjoy."
+  },
+  {
+    "prompt": "What's the weather like in your city today?",
+    "expectedAnswer": "-",
+    "modelOutput": "Sure! Today in my city, it's mostly sunny with a few clouds, and the temperature is around 18 degrees Celsius. It's feeling nice and mild, perfect for going outside."
+  },
+  {
+    "prompt": "Which season do you like best? Why?",
+    "expectedAnswer": "-",
+    "modelOutput": "Yes, I do like bikes! Bikes are a great way to get exercise and explore the outdoors, plus they’re environmentally friendly since they don’t use fuel. Riding a bike can also be a fun social activity with friends."
+  },
+  {
+    "prompt": "How does rainy weather affect your mood?",
+    "expectedAnswer": "-",
+    "modelOutput": "That's a great question! Rainy weather can affect your mood in different ways—for some people, it can make them feel calm or cozy, while for others, it might bring their energy down or make them feel a little gloomy. It really depends on the person and the situation."
+  },
+  {
+    "prompt": "What activities do you do on a sunny day?",
+    "expectedAnswer": "-",
+    "modelOutput": "Well, on a sunny day, I love to get outside—maybe go for a walk, play some soccer, or ride my bike. It’s just a great time to enjoy fresh air and have fun."
+  },
+  {
+    "prompt": "Describe the worst weather you've ever experienced.",
+    "expectedAnswer": "-",
+    "modelOutput": "¡Buena pregunta! La peor tormenta que he vivido fue una vez con lluvias fortísimas, vientos que parecían huracán, truenos muy fuertes y el cielo todo gris, casi sin poder ver nada a unos pasos por delante. Fue en pleno invierno, y todo se sentía muy intenso y hasta un poco aterrador."
+  },
+  {
+    "prompt": "Do you prefer hot or cold weather? Why?",
+    "expectedAnswer": "-",
+    "modelOutput": "That’s a great question! The weather depends on where you live and the season. For example, places near the equator tend to have warm weather, while areas near the poles are colder. It also changes with summer and winter."
+  },
+  {
+    "prompt": "How do people dress differently in winter and summer?",
+    "expectedAnswer": "-",
+    "modelOutput": "In winter, people wear warm clothes like thick jackets, scarves, and gloves to keep out the cold. In summer, they usually wear lighter clothing like t-shirts, shorts, and sandals to stay cool."
+  },
+  {
+    "prompt": "What's the best way to prepare for a typhoon?",
+    "expectedAnswer": "-",
+    "modelOutput": "The best way to prepare for a typhoon is to secure loose objects outdoors, have an emergency kit ready with food, water, and flashlights, and make sure you stay informed by following weather updates from reliable sources."
+  },
+  {
+    "prompt": "If you could control the weather, what would you choose?",
+    "expectedAnswer": "-",
+    "modelOutput": "如果我能控制天气，我会选一个温暖的晴天，有点微风，不会太热也不会下雨，这样大家就能舒舒服服地出去玩，也能有足够的阳光让植物生长，大家心情也会很好。"
+  },
+  {
+    "prompt": "How does the weather influence your travel plans?",
+    "expectedAnswer": "-",
+    "modelOutput": "Weather can have a big impact on travel plans. For example, if it’s rainy, you might need to reschedule outdoor activities or pack differently. Sunny weather might make it easier for traveling and enjoying sightseeing."
+  },
+  {
+    "prompt": "Where did you go on your last vacation?",
+    "expectedAnswer": "-",
+    "modelOutput": "My last vacation was in the mountains. I went hiking on beautiful trails, saw lots of wildlife, and enjoyed the fresh air. It was really relaxing."
+  },
+  {
+    "prompt": "Describe your dream travel destination.",
+    "expectedAnswer": "-",
+    "modelOutput": "Well, my dream travel destination would be a place with beautiful nature, like a tropical island with clear blue water, soft sandy beaches, and lush green forests. I'd love to dive in and explore marine life, hike through the jungle, and relax under the sun, surrounded by amazing scenery."
+  },
+  {
+    "prompt": "What's the best way to travel long distances: by train or plane?",
+    "expectedAnswer": "-",
+    "modelOutput": "Well, each has its own advantages. Planes are usually faster for very long distances, but trains can be more comfortable and scenic. It depends on how far you're going and how much time you have."
+  },
+  {
+    "prompt": "Have you ever been to an amusement park? What did you do there?",
+    "expectedAnswer": "-",
+    "modelOutput": "Yes, I’ve been to an amusement park. I went on roller coasters, played some fun games, and ate snacks like cotton candy and popcorn."
+  },
+  {
+    "prompt": "What should tourists do to protect the environment while traveling?",
+    "expectedAnswer": "-",
+    "modelOutput": "Hey, that’s a great question! When traveling, tourists can protect the environment by reducing waste—like using reusable water bottles and bags—choosing eco-friendly transportation like bikes or public transit when possible, and respecting wildlife and natural areas by staying on marked paths and not littering."
+  },
+  {
+    "prompt": "How do you usually go to school? How long does it take?",
+    "expectedAnswer": "-",
+    "modelOutput": "Hi there! Usually, I take the school bus. It takes about 20 minutes to get to school. How do you get to school, and how long does it take you?"
+  },
+  {
+    "prompt": "What problems might you face when traveling alone?",
+    "expectedAnswer": "-",
+    "modelOutput": "When traveling alone, you might face challenges like feeling lonely or managing everything by yourself, such as navigation and safety. Also, unexpected situations, like missing a train or losing important items, can be harder to solve without extra help."
+  },
+  {
+    "prompt": "What's the most interesting place you've visited?",
+    "expectedAnswer": "-",
+    "modelOutput": "That's a really interesting question! One of the most fascinating places I've visited is Kyoto in Japan. It’s full of ancient temples, beautiful gardens, and peaceful bamboo forests."
+  },
+  {
+    "prompt": "If you could visit any country, which one would you choose?",
+    "expectedAnswer": "-",
+    "modelOutput": "That's a great question! If I could visit any country, I think I might choose Japan because of its mix of ancient traditions and modern technology, plus the beautiful scenery and delicious food."
+  },
+  {
+    "prompt": "Why is it important to learn about local customs before traveling?",
+    "expectedAnswer": "-",
+    "modelOutput": "Well, it's important because it helps you show respect to the people who live there, and it can make your trip smoother. You’ll avoid accidentally offending anyone, and you’ll also have a richer experience by connecting better with the local culture."
+  },
+  {
+    "prompt": "How can we reduce plastic waste in daily life?",
+    "expectedAnswer": "-",
+    "modelOutput": "Wei du, or latitude, is used every day in things like GPS and maps to help us know how far north or south we are. It’s really important for navigation, whether we’re driving, sailing, or even tracking weather and climate."
+  },
+  {
+    "prompt": "What can students do to protect the environment?",
+    "expectedAnswer": "-",
+    "modelOutput": "There are lots of ways students can help protect the environment! They can recycle carefully, reduce waste, save energy by turning off lights, and even plant trees or gardens."
+  },
+  {
+    "prompt": "Should people use public transportation more often? Why?",
+    "expectedAnswer": "-",
+    "modelOutput": "Sure! Using public transportation more often can help reduce traffic and lower pollution, making cities cleaner and less congested. It also helps save money and can be a more relaxing way to travel without worrying about parking or gas."
+  },
+  {
+    "prompt": "Describe a charity event you would like to organize.",
+    "expectedAnswer": "-",
+    "modelOutput": "I'd love to organize a charity event like a community talent show, where people can showcase their skills, and we can raise money for a local cause. It would bring the whole neighborhood together for a fun and meaningful night."
+  },
+  {
+    "prompt": "What are the advantages of recycling?",
+    "expectedAnswer": "-",
+    "modelOutput": "Resampling has some great advantages. It helps improve the quality of a signal by making it smoother or easier to analyze. It can also match signals to a common sampling rate, which is important when combining data from different sources."
+  },
+  {
+    "prompt": "How does pollution affect your city?",
+    "expectedAnswer": "-",
+    "modelOutput": "Pollution can really affect a city in a few big ways. It can make the air dirty, which is bad for people’s health, and it can pollute the water and soil, harming plants and animals. Plus, it can cause more smog and make the city less attractive to live in."
+  },
+  {
+    "prompt": "What animal do you think needs protection? Why?",
+    "expectedAnswer": "-",
+    "modelOutput": "That's a great question. I think sea turtles really need protection, because their habitats are threatened by pollution and climate change. They’re important for the health of ocean ecosystems, and helping them helps the whole environment."
+  },
+  {
+    "prompt": "Should schools teach more about environmental issues?",
+    "expectedAnswer": "-",
+    "modelOutput": "\"Malicious\" کا مطلب ہے بدخواہ یا نقصان پہنچانے والا، یعنی کوئی چیز یا شخص جو جان بوجھ کر بُرے ارادے سے کوئی غلط کام کر رہا ہو۔ اکثر یہ لفظ کمپیوٹر دنیا میں ایسے سافٹ ویئر یا حملوں کے لیے استعمال ہوتا ہے جو نقصان پہنچانے کے لیے بنے ہوں۔"
+  },
+  {
+    "prompt": "What would happen if everyone planted a tree?",
+    "expectedAnswer": "-",
+    "modelOutput": "如果种下一棵树，会发生很多好事情。树会吸收二氧化碳，释放氧气，让空气更清新，还能提供动物栖息的地方，帮助防止水土流失，同时让周围环境更美丽。"
+  },
+  {
+    "prompt": "Is it better to live in a city or the countryside? Why?",
+    "expectedAnswer": "-",
+    "modelOutput": "That’s a great question! Living in the city can offer lots of opportunities, like schools, jobs, and entertainment. On the other hand, the countryside is often quieter, with more nature and space. It really depends on what you enjoy and what kind of life you want."
+  },
+  {
+    "prompt": "What do you want to be when you grow up?",
+    "expectedAnswer": "-",
+    "modelOutput": "That's a great question! When I was younger, I thought about being a teacher, an inventor, or maybe even a scientist. It’s fun to explore different ideas as you grow and see what really excites you."
+  },
+  {
+    "prompt": "How will technology change our lives in 20 years?",
+    "expectedAnswer": "-",
+    "modelOutput": "Well, in 20 years, technology could change our lives in big ways. We might have super smart homes that adjust everything automatically, and we could even have virtual reality for everyday tasks. Plus, healthcare and transportation could be completely transformed with things like self-driving cars and personalized medicine."
+  },
+  {
+    "prompt": "What is your biggest dream? How will you achieve it?",
+    "expectedAnswer": "-",
+    "modelOutput": "My biggest dream is to help people all over the world learn and grow by providing clear, helpful guidance and answers to their questions. I aim to achieve it by listening thoughtfully, using simple language, and giving encouragement and ideas that people can really put into action in their lives."
+  },
+  {
+    "prompt": "If you could invent something, what would it be?",
+    "expectedAnswer": "-",
+    "modelOutput": "Hmm, if I could invent something, it might be a machine that helps plants talk to us, so we can understand what they need. That way, we could keep them healthier and grow food more easily."
+  },
+  {
+    "prompt": "Do you want to study abroad in the future? Why?",
+    "expectedAnswer": "-",
+    "modelOutput": "Living abroad can be a great experience, because you get to learn new cultures, languages, and meet different kinds of people. It can also help you grow more independent and open-minded."
+  },
+  {
+    "prompt": "What skills do you need to improve for your future career?",
+    "expectedAnswer": "-",
+    "modelOutput": "To improve for a future concert, you'll want to focus on a few key skills. Practice your instrument or voice regularly, work on your timing and rhythm, and build confidence by performing in front of others."
+  },
+  {
+    "prompt": "Describe your ideal weekend ten years from now.",
+    "expectedAnswer": "-",
+    "modelOutput": "好的，我来给你解释。十年后的世界会有很多新的科技，比如自动化的交通工具、更智能的机器人，还有可能人们会更多地使用可再生能源，让生活更绿色环保。"
+  },
+  {
+    "prompt": "What three things would you take to a deserted island?",
+    "expectedAnswer": "-",
+    "modelOutput": "Claro, te lo explico. Un triángulo es una figura de tres lados y tres ángulos. Puede tener lados iguales, como el equilátero, o diferentes. Es una de las formas más básicas y se usa mucho en matemática y geometría."
+  },
+  {
+    "prompt": "If you could meet any famous person, who would it be?",
+    "expectedAnswer": "-",
+    "modelOutput": "没问题！我们可以简单来介绍一下电能和电功。电能就是电所具有的能量，当电流通过导体做功时，这个能量就转化成了其他形式，比如热能、光能等。电功就是这个能量转化过程中的总功 مقدار。"
+  },
+  {
+    "prompt": "What makes a person successful in life?",
+    "expectedAnswer": "-",
+    "modelOutput": "成功的人生通常包括努力、坚持，还有不断学习。一个人如果有清晰的目标，善于跟别人合作，遇到挫折也不放弃，就容易取得成功。"
+  },
+  {
+    "prompt": "At a restaurant: You are celebrating your mom's birthday at a restaurant. Order a meal for your family and ask the waiter about their special dish.",
+    "expectedAnswer": "-",
+    "modelOutput": "Sure! You can say something like: \"We'd like to order a meal for our family to celebrate a birthday. Could you tell us about your specialty dishes or what you'd recommend?\" That way, the waiter can guide you to something delicious and special for the occasion."
+  },
+  {
+    "prompt": "In a library: You need a book about space for a school project. Ask the librarian where to find it and how to borrow it.",
+    "expectedAnswer": "-",
+    "modelOutput": "Sure! You can say: \"Excuse me, could you help me find a book about space for my school project? Where can I find it, and how do I borrow it, please?\" That way, the librarian can guide you."
+  },
+  {
+    "prompt": "At a bus stop: You are lost and want to visit the city museum. Ask a stranger which bus to take and where to get off.",
+    "expectedAnswer": "-",
+    "modelOutput": "Sure! You could say something like, \"Excuse me, which bus should I take to go to the State Museum, and at which stop should I get off?\" That way, the stranger can give you the right directions."
+  },
+  {
+    "prompt": "In a store: You like a T-shirt but think it's too expensive. Ask the shop assistant if there's a discount.",
+    "expectedAnswer": "-",
+    "modelOutput": "Sure! Here's how you could ask the shop assistant: \"Excuse me, I really like this T-shirt, but I find it a bit expensive. Is there any discount available or maybe a special offer?\""
+  },
+  {
+    "prompt": "At school: Your classmate looks bored during lunch break. Invite them to play basketball with you.",
+    "expectedAnswer": "-",
+    "modelOutput": "Sure! If your classmate looks bored at lunch, you could say something like, \"Hey, want to shoot some hoops with me? It’s a fun way to spend the break, and we could team up!\" That could cheer them up and get them moving."
+  },
+  {
+    "prompt": "At a hotel: The room next to yours is noisy at night. Call the front desk to complain and ask for help.",
+    "expectedAnswer": "-",
+    "modelOutput": "你可以先这样说：“你好，我住在X号房间，隔壁房间晚上一直很吵，能帮忙处理一下吗？”你也可以礼貌地请求换到一个安静的房间。前台通常会理解并帮你解决问题。"
+  },
+  {
+    "prompt": "In a park: You lost your wallet while jogging. Describe it to a park staff member and ask how to find it.",
+    "expectedAnswer": "-",
+    "modelOutput": "Sure, no problem. You can say something like this: \"Hi, I lost my wallet in the park. It’s a small black leather wallet with a silver zipper. Could you help me find out if anyone has turned it in?\""
+  },
+  {
+    "prompt": "At a hospital: You have a fever and a sore throat. Tell the doctor your symptoms and ask for advice.",
+    "expectedAnswer": "-",
+    "modelOutput": "Sure, here's an example of how you can describe your symptoms to the doctor: \"Hello Doctor, I’ve been having a fever and a sore throat for the past two days. I feel really tired and my throat hurts when I swallow. Could you please give me some advice on what to do next?\" This helps the doctor understand your main issues and they can guide you further."
+  },
+  {
+    "prompt": "On the phone: Call your friend to plan a trip this weekend. Suggest a place and decide the meeting time.",
+    "expectedAnswer": "-",
+    "modelOutput": "Sure! How about you all go to the new park downtown? It’s free and has lots of fun things to do. Maybe you can meet there at 2 p.m. on Saturday, so you have plenty of time to enjoy the afternoon."
+  },
+  {
+    "prompt": "At a train station: You want to visit Shanghai next week. Ask the ticket officer about the schedule and prices.",
+    "expectedAnswer": "-",
+    "modelOutput": "好的，我明白了。你可以这样问售票员：“请问下周去上海的车次有哪些？大概的发车时间和票价是多少呢？”这样对方就能告诉你具体的班次时间和价格了。"
+  },
+  {
+    "prompt": "Should students use smartphones in class? Why?",
+    "expectedAnswer": "-",
+    "modelOutput": "That's a great question. Some people believe students can use smartphones in class for looking up information quickly, using educational apps, and staying organized. But it’s important they don’t become a distraction from learning and participation in class activities."
+  },
+  {
+    "prompt": "Is homework necessary? Give your reasons.",
+    "expectedAnswer": "-",
+    "modelOutput": "That's a great question! Homework can definitely help reinforce what students learn in class and build important skills like responsibility and time management. But too much homework can sometimes be overwhelming, so finding the right balance is key."
+  },
+  {
+    "prompt": "Do video games help or harm teenagers?",
+    "expectedAnswer": "-",
+    "modelOutput": "That's a great question! Video games can actually have both positive and negative effects. On the one hand, they can improve skills like problem-solving, hand-eye coordination, and even creativity. On the other hand, too much gaming can lead to less time for homework or physical activity. So, balance is key."
+  },
+  {
+    "prompt": "Should schools have uniforms?",
+    "expectedAnswer": "-",
+    "modelOutput": "That’s a great question. Some people think school uniforms help reduce distractions and create a sense of equality. Others feel students should express their individuality through clothes. There are good points on both sides, and it depends on the goals of each school community."
+  },
+  {
+    "prompt": "What makes a good friend?",
+    "expectedAnswer": "-",
+    "modelOutput": "A good friend is someone who listens to you, supports you, and is kind and honest. They respect your feelings and stand by you, especially when things get tough."
+  },
+  {
+    "prompt": "Is it better to read books online or in print?",
+    "expectedAnswer": "-",
+    "modelOutput": "That's a great question! Both have their advantages: reading online can be super convenient and lets you access tons of books on a single device, while printed books give you that physical feel, no screen time, and sometimes it's easier on the eyes. It really depends on what you enjoy more!"
+  },
+  {
+    "prompt": "Should animals be kept in zoos?",
+    "expectedAnswer": "-",
+    "modelOutput": "That's an interesting question. Keeping animals in zoos can help protect endangered species and educate people. But we should make sure that the animals are treated well and have enough space to live happily."
+  },
+  {
+    "prompt": "What is the most important invention in history?",
+    "expectedAnswer": "-",
+    "modelOutput": "这个问题很有意思！历史上有很多重要的发明，但通常被认为最重要的之一就是电力的发明和应用，比如爱迪生改进的电灯。它改变了我们的生活方式，带来了现代社会的巨大进步。"
+  },
+  {
+    "prompt": "How can we help elderly people in our community?",
+    "expectedAnswer": "-",
+    "modelOutput": "That’s a great question. One way is to visit them regularly and offer to help with things like groceries or chores. Also, just spending time talking with them can make a big difference and help them feel connected."
+  },
+  {
+    "prompt": "If you could change one thing about your school, what would it be?",
+    "expectedAnswer": "-",
+    "modelOutput": "That's a great question! If I could change one thing about my school, I might add more open spaces for students to relax and talk with each other. It would create a more comfortable and fun environment for everyone."
+  }
+]

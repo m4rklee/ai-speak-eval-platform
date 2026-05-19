@@ -1,0 +1,23 @@
+# Web 框架
+fastapi>=0.115.6,<1.0.0
+uvicorn[standard]>=0.34.0,<1.0.0
+python-multipart>=0.0.12,<1.0.0
+
+# 配置和数据校验
+pydantic>=2.13.0,<3.0.0
+pydantic-settings>=2.5.2,<3.0.0
+python-dotenv>=1.0.1,<2.0.0
+
+# 数据库：MySQL + SQLAlchemy
+sqlalchemy>=2.0.36,<3.0.0
+greenlet>=3.0.0,<4.0.0
+pymysql>=1.1.1,<2.0.0
+asyncmy>=0.2.11,<1.0.0
+cryptography>=43.0.0,<47.0.0
+
+# Redis / Session
+redis>=5.0.8,<7.0.0
+
+# OpenRouter
+openai>=2.36.0,<3.0.0
+httpx>=0.28.1,<1.0.0

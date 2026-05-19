@@ -1,0 +1,41 @@
+# Dependencies
+frontend/node_modules/
+python-backend/.venv/
+python-backend/venv/
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+
+# Build / cache
+frontend/dist/
+frontend/.vite/
+**/.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+python-backend/.env
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+
+# Logs & runtime
+*.log
+/tmp/
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Local data (adjust if you need to version some datasets)
+python-backend/data/
+*.db
+*.sqlite3
+
+# Large backups (keep repo lean)
+*.tar.gz
+backups/
