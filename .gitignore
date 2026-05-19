@@ -35,7 +35,9 @@ python-backend/logs/
 .vscode/
 *.swp
 
-# Local data (adjust if you need to version some datasets)
+# Local datasets（勿提交 GitHub；保留 data/README.md 说明）
+data/questiontext/
+**/listen_eval/
 python-backend/data/
 *.db
 *.sqlite3
