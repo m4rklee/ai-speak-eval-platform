@@ -25,7 +25,11 @@ frontend/.env.*.local
 
 # Logs & runtime
 *.log
+python-backend/logs/
 /tmp/
+**/.DS_Store
+._*
+**/__MACOSX/
 .DS_Store
 .idea/
 .vscode/
