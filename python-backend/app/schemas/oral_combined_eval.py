@@ -18,6 +18,38 @@ class OralCombinedHealthVO(BaseModel):
     judge_model: str = Field(default="", alias="judgeModel")
     max_files_per_job: int = Field(default=200, alias="maxFilesPerJob")
     engine: str = "daemon"
+    oral_gen_ready: bool = Field(default=False, alias="oralGenReady")
+    questionwav_count: int = Field(default=0, alias="questionwavCount")
+    oral_gen_message: str = Field(default="", alias="oralGenMessage")
+
+    model_config = {"populate_by_name": True}
+
+
+class OralCombinedGenRowVO(BaseModel):
+    stem: str = ""
+    text: str = ""
+    has_audio: bool = Field(default=False, alias="hasAudio")
+    error: Optional[str] = None
+    input_tokens: int = Field(default=0, alias="inputTokens")
+    output_tokens: int = Field(default=0, alias="outputTokens")
+
+    model_config = {"populate_by_name": True}
+
+
+class OralCombinedPipelineCreateVO(BaseModel):
+    model: str
+    source: str = "builtin"
+    sample_mode: str = Field(default="random", alias="sampleMode")
+    sample_count: int = Field(default=2, alias="sampleCount")
+    seed: Optional[int] = None
+    request_interval: Optional[float] = Field(default=None, alias="requestInterval")
+    auto_start_eval: bool = Field(default=True, alias="autoStartEval")
+
+    model_config = {"populate_by_name": True}
+
+
+class OralCombinedFromOralGenVO(BaseModel):
+    auto_start_eval: bool = Field(default=True, alias="autoStartEval")
 
     model_config = {"populate_by_name": True}
 
@@ -62,11 +94,21 @@ class OralCombinedPerFileVO(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class OralCombinedGenSummaryVO(BaseModel):
+    total: int = 0
+    success: int = 0
+    failed: int = 0
+    eval_skipped: int = Field(default=0, alias="evalSkipped")
+
+    model_config = {"populate_by_name": True}
+
+
 class OralCombinedSummaryVO(BaseModel):
     pair_count: int = Field(default=0, alias="pairCount")
     ok_count: int = Field(default=0, alias="okCount")
     partial_count: int = Field(default=0, alias="partialCount")
     error_count: int = Field(default=0, alias="errorCount")
+    gen_summary: Optional[OralCombinedGenSummaryVO] = Field(default=None, alias="genSummary")
     accuracy_mean: Optional[float] = Field(default=None, alias="accuracyMean")
     fluency_mean: Optional[float] = Field(default=None, alias="fluencyMean")
     naturalness_mean: Optional[float] = Field(default=None, alias="naturalnessMean")
@@ -94,6 +136,11 @@ class OralCombinedJobVO(BaseModel):
         default=None, alias="progressDetail"
     )
     audio_available: bool = Field(default=False, alias="audioAvailable")
+    pipeline_mode: bool = Field(default=False, alias="pipelineMode")
+    model: Optional[str] = None
+    gen_rows: Optional[list[OralCombinedGenRowVO]] = Field(default=None, alias="genRows")
+    gen_summary: Optional[OralCombinedGenSummaryVO] = Field(default=None, alias="genSummary")
+    auto_start_eval: Optional[bool] = Field(default=None, alias="autoStartEval")
 
     model_config = {"populate_by_name": True}
 

@@ -16,7 +16,7 @@ from app.db.redis_session import RedisSessionBackend
 from app.core.config import get_settings
 from app.core.logging_config import LoggingConfig
 from app.middleware.session_middleware import RedisSessionMiddleware
-from app.api import batch, content_eval, conversation, health, listen_eval, model, oral_combined_eval, rating, scenario, stats, test, unified_eval, user, voice, ws_batch
+from app.api import batch, content_eval, conversation, health, listen_eval, model, oral_combined_eval, oral_gen, rating, scenario, stats, test, unified_eval, user, voice, ws_batch
 from app.services.oral_eval.unified_eval_daemon_manager import stop_daemons
 
 
@@ -116,6 +116,7 @@ app.include_router(unified_eval.router, prefix="/api")
 app.include_router(content_eval.router, prefix="/api")
 app.include_router(oral_combined_eval.router, prefix="/api")
 app.include_router(listen_eval.router, prefix="/api")
+app.include_router(oral_gen.router, prefix="/api")
 
 @app.get("/")
 async def root():

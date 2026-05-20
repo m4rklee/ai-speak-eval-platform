@@ -69,6 +69,16 @@ class Settings(BaseSettings):
     LISTEN_EVAL_REQUEST_INTERVAL_SEC: float = 1.0
     LISTEN_EVAL_JOB_WORKERS: int = 1
 
+    # 口语回复生成（教师模式 API：音频 in → 文本 + 音频 out）
+    ORAL_GEN_QUESTIONWAV_DIR: str = "/root/autodl-tmp/questionwav"
+    ORAL_GEN_OUTPUT_ROOT: str = "/tmp/oral_gen_output"
+    ORAL_GEN_MAX_SAMPLES_PER_JOB: int = 200
+    ORAL_GEN_REQUEST_INTERVAL_SEC: float = 1.0
+    ORAL_GEN_JOB_WORKERS: int = 1
+
+    # 综合评测一站式流水线工作目录
+    ORAL_COMBINED_WORK_ROOT: str = "/tmp/oral_combined_work"
+
     @property
     def content_eval_question_dir(self) -> str:
         import os

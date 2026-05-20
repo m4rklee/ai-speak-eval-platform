@@ -12,6 +12,12 @@
           题库 {{ health?.questionDirOk ? '就绪' : '异常' }}
         </a-tag>
         <a-tag v-if="health?.questionCount" color="blue">{{ health.questionCount }} 题</a-tag>
+        <a-tag v-if="health?.questionwavCount" color="cyan">
+          题目音频 {{ health.questionwavCount }} 条
+        </a-tag>
+        <a-tag :color="health?.oralGenReady ? 'green' : 'default'">
+          回复生成 API {{ health?.oralGenReady ? '就绪' : '未就绪' }}
+        </a-tag>
         <span v-if="health?.judgeModel" class="hint">Judge: {{ health.judgeModel }}</span>
       </a-space>
       <a-alert
@@ -29,6 +35,104 @@
 
     <a-card class="section">
       <a-tabs v-model:activeKey="batchMode" size="small">
+        <a-tab-pane key="pipeline" tab="一站式（生成+评测）">
+          <a-form layout="vertical" class="pipeline-form">
+            <a-form-item label="系统提示词（固定）">
+              <a-textarea :value="systemPrompt" :rows="3" readonly />
+            </a-form-item>
+            <a-form-item label="平台筛选">
+              <a-select
+                v-model:value="filterPlatform"
+                allow-clear
+                placeholder="全部平台"
+                style="width: 220px"
+                @change="onFilterPlatformChange"
+              >
+                <a-select-option v-for="p in platformOptions" :key="p" :value="p">
+                  {{ platformLabel(p) }}
+                </a-select-option>
+              </a-select>
+            </a-form-item>
+            <a-form-item label="生成模型" required>
+              <a-select
+                v-model:value="selectedModelId"
+                show-search
+                placeholder="需支持音频输入与输出"
+                :loading="modelsLoading"
+                :options="audioIoModelOptions"
+                style="width: 100%; max-width: 520px"
+                @change="onModelChange"
+              />
+            </a-form-item>
+            <a-form-item v-if="showProviderSelect" label="调用平台" required>
+              <a-radio-group v-model:value="selectedProviderPlatform">
+                <a-radio v-for="p in providerPlatforms" :key="p" :value="p">
+                  {{ platformLabel(p) }}
+                </a-radio>
+              </a-radio-group>
+            </a-form-item>
+            <a-form-item label="题目来源">
+              <a-radio-group v-model:value="pipelineInputSource">
+                <a-radio value="builtin">内置 questionwav</a-radio>
+                <a-radio value="upload">上传题目 wav</a-radio>
+              </a-radio-group>
+            </a-form-item>
+            <template v-if="pipelineInputSource === 'builtin'">
+              <a-form-item label="抽样">
+                <a-radio-group v-model:value="pipelineSampleMode">
+                  <a-radio value="random">随机 N 条</a-radio>
+                  <a-radio value="all">全量</a-radio>
+                </a-radio-group>
+              </a-form-item>
+              <a-form-item v-if="pipelineSampleMode === 'random'" label="N">
+                <a-input-number
+                  v-model:value="pipelineSampleCount"
+                  :min="1"
+                  :max="health?.questionwavCount || health?.maxFilesPerJob || 200"
+                />
+              </a-form-item>
+              <a-form-item v-if="pipelineSampleMode === 'random'" label="种子（可选）">
+                <a-input-number v-model:value="pipelineSeed" />
+              </a-form-item>
+            </template>
+            <template v-else>
+              <a-form-item label="上传题目 wav">
+                <a-upload
+                  :multiple="true"
+                  :file-list="pipelineUploadFileList"
+                  accept=".wav,audio/wav"
+                  :before-upload="onPipelineUploadBefore"
+                  @remove="onPipelineUploadRemove"
+                >
+                  <a-button>
+                    <SoundOutlined />
+                    选择 wav（{{ pipelineUploadFiles.length }}）
+                  </a-button>
+                </a-upload>
+              </a-form-item>
+            </template>
+            <a-form-item label="请求间隔（秒）">
+              <a-input-number v-model:value="pipelineRequestInterval" :min="0" :max="30" :step="0.5" />
+            </a-form-item>
+            <a-form-item label="执行方式">
+              <a-radio-group v-model:value="pipelineAutoStart">
+                <a-radio :value="true">生成后自动开始综合评测</a-radio>
+                <a-radio :value="false">生成后先预览，再手动开始综合评测</a-radio>
+              </a-radio-group>
+            </a-form-item>
+          </a-form>
+          <a-button
+            type="primary"
+            class="action-btn"
+            :loading="jobLoading"
+            :disabled="!canSubmitPipeline"
+            @click="runPipeline"
+          >
+            提交一站式任务
+          </a-button>
+        </a-tab-pane>
+        <a-tab-pane key="upload" tab="上传答案对">
+      <a-tabs v-model:activeKey="uploadMode" size="small" class="upload-subtabs">
         <a-tab-pane key="multi" tab="多文件">
           <a-space wrap class="upload-actions">
             <a-upload
@@ -96,9 +200,11 @@
           </a-space>
         </a-tab-pane>
       </a-tabs>
+        </a-tab-pane>
+      </a-tabs>
 
       <a-table
-        v-if="pairPreview.length"
+        v-if="batchMode === 'upload' && pairPreview.length"
         class="pair-table"
         size="small"
         :pagination="false"
@@ -108,6 +214,7 @@
       />
 
       <a-button
+        v-if="batchMode === 'upload'"
         type="primary"
         class="action-btn"
         :loading="jobLoading"
@@ -135,7 +242,52 @@
           :job-status="jobStatus.status"
         />
         <a-alert v-if="jobStatus?.error" type="error" :message="jobStatus.error" show-icon />
+        <a-button
+          v-if="jobStatus?.status === 'awaiting_eval'"
+          type="primary"
+          :loading="continueLoading"
+          @click="continueEval"
+        >
+          开始综合评测（{{ evaluableGenCount }} 条）
+        </a-button>
       </a-space>
+    </a-card>
+
+    <a-card
+      v-if="genRows.length"
+      title="生成结果预览"
+      class="section"
+      size="small"
+    >
+      <a-descriptions v-if="jobStatus?.genSummary" size="small" :column="4" bordered class="summary-desc">
+        <a-descriptions-item label="生成总数">{{ jobStatus.genSummary.total }}</a-descriptions-item>
+        <a-descriptions-item label="成功">{{ jobStatus.genSummary.success }}</a-descriptions-item>
+        <a-descriptions-item label="失败">{{ jobStatus.genSummary.failed }}</a-descriptions-item>
+        <a-descriptions-item label="跳过评测">{{ jobStatus.genSummary.evalSkipped }}</a-descriptions-item>
+      </a-descriptions>
+      <a-table
+        size="small"
+        :data-source="genRows"
+        :columns="genColumns"
+        row-key="stem"
+        :pagination="false"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'play'">
+            <a-button
+              v-if="record.hasAudio && jobId"
+              type="link"
+              size="small"
+              @click="playAudio(`${record.stem}.wav`)"
+            >
+              播放
+            </a-button>
+          </template>
+          <template v-else-if="column.key === 'error'">
+            <span class="gen-error">{{ record.error || (record.hasAudio ? '—' : '无音频') }}</span>
+          </template>
+        </template>
+      </a-table>
     </a-card>
 
     <a-card
@@ -204,15 +356,22 @@ import {
 import { useLoginUserStore } from '@/stores/loginUser'
 import { getContentEvalHealth } from '@/api/contentEvalController'
 import {
+  continueOralCombinedJob,
+  createOralCombinedFromOralGen,
   createOralCombinedJob,
+  createOralCombinedPipelineJob,
+  createOralCombinedPipelineUpload,
   getOralCombinedAudioUrl,
   getOralCombinedHealth,
   getOralCombinedJob,
+  type OralCombinedGenRow,
   type OralCombinedHealth,
   type OralCombinedJob,
   type OralCombinedPerFile,
 } from '@/api/oralCombinedEvalController'
+import { getOralGenHealth } from '@/api/oralGenController'
 import { getUnifiedEvalHealth } from '@/api/unifiedEvalController'
+import { useAudioIoModels } from '@/composables/useAudioIoModels'
 import UniEvalTqdmBar from '@/components/UniEvalTqdmBar.vue'
 
 const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
@@ -220,9 +379,35 @@ const emit = defineEmits<{ (e: 'jobs-changed'): void }>()
 
 const loginUserStore = useLoginUserStore()
 
+const {
+  filterPlatform,
+  platformOptions,
+  platformLabel,
+  modelsLoading,
+  selectedModelId,
+  selectedProviderPlatform,
+  providerPlatforms,
+  showProviderSelect,
+  effectiveModelId,
+  audioIoModelOptions,
+  onFilterPlatformChange,
+  onModelChange,
+} = useAudioIoModels()
+
 const health = ref<OralCombinedHealth | null>(null)
 const healthLoading = ref(false)
-const batchMode = ref<'multi' | 'dir'>('multi')
+const systemPrompt = ref('')
+const batchMode = ref<'pipeline' | 'upload'>('pipeline')
+const uploadMode = ref<'multi' | 'dir'>('multi')
+const pipelineInputSource = ref<'builtin' | 'upload'>('builtin')
+const pipelineSampleMode = ref<'all' | 'random'>('random')
+const pipelineSampleCount = ref(2)
+const pipelineSeed = ref<number | undefined>()
+const pipelineRequestInterval = ref(1)
+const pipelineAutoStart = ref(true)
+const pipelineUploadFiles = ref<File[]>([])
+const pipelineUploadFileList = ref<UploadProps['fileList']>([])
+const continueLoading = ref(false)
 const multiWavFiles = ref<File[]>([])
 const multiTxtFiles = ref<File[]>([])
 const multiWavFileList = ref<UploadProps['fileList']>([])
@@ -244,7 +429,7 @@ type PairRow = {
 }
 
 const allFiles = computed(() => {
-  if (batchMode.value === 'multi') return [...multiWavFiles.value, ...multiTxtFiles.value]
+  if (uploadMode.value === 'multi') return [...multiWavFiles.value, ...multiTxtFiles.value]
   return dirFiles.value
 })
 
@@ -254,7 +439,7 @@ const pairedCount = computed(() => pairPreview.value.filter((p) => p.paired).len
 
 const canSubmit = computed(() => {
   const hasInput =
-    batchMode.value === 'dir'
+    uploadMode.value === 'dir'
       ? allFiles.value.length > 0 || !!zipFile.value
       : multiWavFiles.value.length > 0 || multiTxtFiles.value.length > 0
   return (
@@ -266,12 +451,37 @@ const canSubmit = computed(() => {
   )
 })
 
+const canSubmitPipeline = computed(() => {
+  if (!loginUserStore.loginUser?.id || !engineReady.value || !pipelineEngineReady.value) {
+    return false
+  }
+  if (!effectiveModelId.value) return false
+  if (pipelineInputSource.value === 'builtin') {
+    return (health.value?.questionwavCount ?? 0) > 0
+  }
+  return pipelineUploadFiles.value.length > 0
+})
+
+const pipelineEngineReady = computed(() => !!health.value?.oralGenReady)
+
 const engineReady = computed(
   () =>
     !!health.value?.pathsOk &&
     !!health.value?.daemonReady &&
     !!health.value?.questionDirOk,
 )
+
+const genRows = computed(() => jobStatus.value?.genRows || [])
+const evaluableGenCount = computed(
+  () => genRows.value.filter((r) => !r.error && r.hasAudio).length,
+)
+
+const genColumns = [
+  { title: 'Stem', dataIndex: 'stem', width: 120 },
+  { title: '回复文本', dataIndex: 'text', ellipsis: true },
+  { title: '播放', key: 'play', width: 72 },
+  { title: '状态', key: 'error', width: 160 },
+]
 
 const engineStatusLabel = computed(() => {
   if (!health.value?.pathsOk) return '路径异常'
@@ -363,6 +573,8 @@ function statusLabel(status: string) {
     failed: '失败',
     running: '进行中',
     pending: '排队',
+    generating: '生成中',
+    awaiting_eval: '待确认评测',
   }
   return map[status] || status
 }
@@ -413,8 +625,123 @@ async function loadHealth() {
     } catch {
       message.error('无法获取引擎状态')
     }
+  }
+  try {
+    const og = await getOralGenHealth()
+    if (health.value) {
+      health.value = {
+        ...health.value,
+        oralGenReady: og.ready,
+        questionwavCount: og.wavCount,
+        oralGenMessage: og.message,
+      }
+    }
+    systemPrompt.value = og.systemPrompt || ''
+  } catch {
+    /* optional */
   } finally {
     healthLoading.value = false
+  }
+}
+
+function onPipelineUploadBefore(file: File) {
+  pipelineUploadFiles.value = [...pipelineUploadFiles.value, file]
+  pipelineUploadFileList.value = pipelineUploadFiles.value.map((f, i) => ({
+    uid: `${i}-${f.name}`,
+    name: f.name,
+    status: 'done',
+  }))
+  return false
+}
+
+function onPipelineUploadRemove(file: { name?: string }) {
+  pipelineUploadFiles.value = pipelineUploadFiles.value.filter((f) => f.name !== file.name)
+  pipelineUploadFileList.value = pipelineUploadFiles.value.map((f, i) => ({
+    uid: `${i}-${f.name}`,
+    name: f.name,
+    status: 'done',
+  }))
+}
+
+async function runPipeline() {
+  if (!requireLogin() || !engineReady.value || !pipelineEngineReady.value) {
+    message.warning('引擎或回复生成 API 未就绪')
+    return
+  }
+  if (!canSubmitPipeline.value || !effectiveModelId.value) {
+    message.warning('请完善一站式配置')
+    return
+  }
+  if (pipelineSampleMode.value === 'all') {
+    const n = health.value?.questionwavCount || 0
+    if (n > 20) {
+      message.warning(`全量将处理 ${n} 条，耗时长且产生 API 费用，请确认`)
+    }
+  }
+
+  jobLoading.value = true
+  jobStatus.value = null
+  try {
+    let id: string
+    if (pipelineInputSource.value === 'upload') {
+      id = await createOralCombinedPipelineUpload(
+        effectiveModelId.value,
+        pipelineUploadFiles.value,
+        pipelineAutoStart.value,
+        pipelineRequestInterval.value,
+      )
+    } else {
+      id = await createOralCombinedPipelineJob({
+        model: effectiveModelId.value,
+        source: 'builtin',
+        sampleMode: pipelineSampleMode.value,
+        sampleCount: pipelineSampleMode.value === 'random' ? pipelineSampleCount.value : undefined,
+        seed: pipelineSeed.value,
+        requestInterval: pipelineRequestInterval.value,
+        autoStartEval: pipelineAutoStart.value,
+      })
+    }
+    jobId.value = id
+    message.success('一站式任务已创建')
+    startPolling(id)
+    emit('jobs-changed')
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : '创建任务失败')
+  } finally {
+    jobLoading.value = false
+  }
+}
+
+async function continueEval() {
+  if (!jobId.value || !requireLogin()) return
+  continueLoading.value = true
+  try {
+    await continueOralCombinedJob(jobId.value)
+    message.success('已开始综合评测')
+    startPolling(jobId.value)
+    emit('jobs-changed')
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : '启动失败')
+  } finally {
+    continueLoading.value = false
+  }
+}
+
+async function importOralGenJob(oralGenJobId: string, autoStartEval = true) {
+  if (!requireLogin() || !engineReady.value) return
+  batchMode.value = 'pipeline'
+  jobLoading.value = true
+  jobStatus.value = null
+  try {
+    const id = await createOralCombinedFromOralGen(oralGenJobId, autoStartEval)
+    jobId.value = id
+    message.success('已导入回复生成结果')
+    startPolling(id)
+    emit('jobs-changed')
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : '导入失败')
+  } finally {
+    jobLoading.value = false
   }
 }
 
@@ -507,10 +834,10 @@ async function runBatch() {
   }
 
   const files =
-    batchMode.value === 'multi'
+    uploadMode.value === 'multi'
       ? [...multiWavFiles.value, ...multiTxtFiles.value]
       : dirFiles.value
-  const archive = batchMode.value === 'dir' ? zipFile.value : null
+  const archive = uploadMode.value === 'dir' ? zipFile.value : null
   if (!files.length && !archive) {
     message.warning('请选择文件或 zip')
     return
@@ -548,7 +875,10 @@ async function pollJob(id: string) {
   try {
     const job = await getOralCombinedJob(id)
     jobStatus.value = job
-    if (job.status === 'completed' || job.status === 'failed') {
+    if (job.status === 'awaiting_eval') {
+      stopPolling()
+      emit('jobs-changed')
+    } else if (job.status === 'completed' || job.status === 'failed') {
       stopPolling()
       emit('jobs-changed')
       if (job.status === 'completed') message.success('综合评测完成')
@@ -566,7 +896,11 @@ async function loadJob(id: string) {
   try {
     const job = await getOralCombinedJob(id)
     jobStatus.value = job
-    if (job.status === 'running' || job.status === 'pending') {
+    if (
+      job.status === 'running' ||
+      job.status === 'pending' ||
+      job.status === 'generating'
+    ) {
       startPolling(id)
     }
     document.getElementById('combined-job-detail')?.scrollIntoView({ behavior: 'smooth' })
@@ -656,7 +990,7 @@ function exportCsv() {
   URL.revokeObjectURL(a.href)
 }
 
-defineExpose({ loadJob })
+defineExpose({ loadJob, importOralGenJob })
 
 onMounted(() => {
   void loadHealth()
@@ -712,5 +1046,18 @@ onUnmounted(() => {
 
 .summary-desc {
   margin-bottom: 12px;
+}
+
+.upload-subtabs {
+  margin-top: 4px;
+}
+
+.pipeline-form {
+  max-width: 640px;
+}
+
+.gen-error {
+  color: #cf1322;
+  font-size: 12px;
 }
 </style>

@@ -113,6 +113,8 @@ export type ModelEvalSlot = {
   files: File[]
   fileList: UploadProps['fileList']
   dirFiles: File[]
+  /** 通过「选文件夹」上传时的根目录名（来自 webkitRelativePath） */
+  dirFolderName?: string
   zipFile: File | null
 }
 

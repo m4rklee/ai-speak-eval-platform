@@ -1,7 +1,8 @@
 <template>
-  <div id="userRegisterPage">
-    <h2 class="title">用户注册</h2>
-    <a-form :model="formState" @finish="handleSubmit">
+  <div class="user-auth-page">
+    <a-card class="user-auth-card" :bordered="false">
+      <h2 class="title">用户注册</h2>
+      <a-form :model="formState" layout="vertical" @finish="handleSubmit">
       <a-form-item
         name="userAccount"
         :rules="[
@@ -9,7 +10,7 @@
           { min: 4, message: '账号长度不能小于4位' },
         ]"
       >
-        <a-input v-model:value="formState.userAccount" placeholder="请输入账号" />
+        <a-input v-model:value="formState.userAccount" placeholder="请输入账号" size="large" />
       </a-form-item>
 
       <a-form-item
@@ -19,7 +20,7 @@
           { min: 8, message: '密码长度不能小于8位' },
         ]"
       >
-        <a-input-password v-model:value="formState.userPassword" placeholder="请输入密码" />
+        <a-input-password v-model:value="formState.userPassword" placeholder="请输入密码" size="large" />
       </a-form-item>
 
       <a-form-item
@@ -30,17 +31,22 @@
           { validator: validateCheckPassword },
         ]"
       >
-        <a-input-password v-model:value="formState.checkPassword" placeholder="请再次输入密码" />
+        <a-input-password
+          v-model:value="formState.checkPassword"
+          placeholder="请再次输入密码"
+          size="large"
+        />
       </a-form-item>
 
       <div class="tips">已有账号 <RouterLink to="/user/login">去登录</RouterLink></div>
 
       <a-form-item>
-        <a-button type="primary" html-type="submit" :loading="submitting" style="width: 100%">
+        <a-button type="primary" html-type="submit" :loading="submitting" block size="large">
           注册
         </a-button>
       </a-form-item>
     </a-form>
+    </a-card>
   </div>
 </template>
 
@@ -83,15 +89,27 @@ const handleSubmit = async (values: UserRegisterRequest) => {
 </script>
 
 <style scoped>
-#userRegisterPage {
-  width: 360px;
-  max-width: calc(100vw - 48px);
-  margin: 48px auto;
+.user-auth-page {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: calc(100vh - 64px - 48px);
+  padding: 48px 24px;
+  box-sizing: border-box;
+}
+
+.user-auth-card {
+  width: 100%;
+  max-width: 400px;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
 }
 
 .title {
-  margin-bottom: 24px;
+  margin: 0 0 24px;
   text-align: center;
+  font-size: 22px;
+  font-weight: 600;
 }
 
 .tips {

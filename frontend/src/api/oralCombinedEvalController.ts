@@ -17,6 +17,9 @@ export type OralCombinedHealth = {
   judgeModel: string
   maxFilesPerJob: number
   engine: string
+  oralGenReady?: boolean
+  questionwavCount?: number
+  oralGenMessage?: string
 }
 
 export type OralCombinedProgressDetail = {
@@ -31,6 +34,22 @@ export type OralCombinedProgressDetail = {
   ratePerSec?: number
   message?: string
   tqdmLine?: string
+}
+
+export type OralCombinedGenRow = {
+  stem: string
+  text?: string
+  hasAudio?: boolean
+  error?: string
+  inputTokens?: number
+  outputTokens?: number
+}
+
+export type OralCombinedGenSummary = {
+  total?: number
+  success?: number
+  failed?: number
+  evalSkipped?: number
 }
 
 export type OralCombinedSpeechSide = {
@@ -80,6 +99,7 @@ export type OralCombinedSummary = {
   themeFocusMean?: number
   answerClarityMean?: number
   compositeMean?: number
+  genSummary?: OralCombinedGenSummary
 }
 
 export type OralCombinedJob = {
@@ -94,6 +114,21 @@ export type OralCombinedJob = {
   finishedAt?: string
   progressDetail?: OralCombinedProgressDetail
   audioAvailable?: boolean
+  pipelineMode?: boolean
+  model?: string
+  genRows?: OralCombinedGenRow[]
+  genSummary?: OralCombinedGenSummary
+  autoStartEval?: boolean
+}
+
+export type OralCombinedPipelineCreate = {
+  model: string
+  source: 'builtin' | 'upload'
+  sampleMode?: 'all' | 'random'
+  sampleCount?: number
+  seed?: number
+  requestInterval?: number
+  autoStartEval: boolean
 }
 
 function unwrap<T>(res: { data: BaseResponse<T> }): T {
@@ -121,6 +156,55 @@ export async function createOralCombinedJob(files: File[], archive?: File) {
     timeout: 120000,
     headers: { 'Content-Type': 'multipart/form-data' },
   })
+  return unwrap(res)
+}
+
+export async function createOralCombinedPipelineJob(body: OralCombinedPipelineCreate) {
+  const res = await request.post<BaseResponse<string>>('/oral-combined/jobs/pipeline', body)
+  return unwrap(res)
+}
+
+export async function createOralCombinedPipelineUpload(
+  model: string,
+  files: File[],
+  autoStartEval: boolean,
+  requestInterval?: number,
+) {
+  const form = new FormData()
+  form.append('model', model)
+  form.append('auto_start_eval', String(autoStartEval))
+  if (requestInterval != null) {
+    form.append('request_interval', String(requestInterval))
+  }
+  for (const f of files) {
+    form.append('files', f)
+  }
+  const res = await request.post<BaseResponse<string>>(
+    '/oral-combined/jobs/pipeline/upload',
+    form,
+    {
+      timeout: 120000,
+      headers: { 'Content-Type': 'multipart/form-data' },
+    },
+  )
+  return unwrap(res)
+}
+
+export async function createOralCombinedFromOralGen(
+  oralGenJobId: string,
+  autoStartEval: boolean,
+) {
+  const res = await request.post<BaseResponse<string>>(
+    `/oral-combined/jobs/from-oral-gen/${encodeURIComponent(oralGenJobId)}`,
+    { autoStartEval },
+  )
+  return unwrap(res)
+}
+
+export async function continueOralCombinedJob(jobId: string) {
+  const res = await request.post<BaseResponse<null>>(
+    `/oral-combined/jobs/${encodeURIComponent(jobId)}/continue`,
+  )
   return unwrap(res)
 }
 

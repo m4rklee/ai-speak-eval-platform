@@ -1,148 +1,88 @@
 # AI 口语评测平台
 
-面向 **语音 / 听力 / 大模型** 的统一评测 Web 平台，支持口语多维打分、听力准确率评测、模型库管理与对比实验。
+> 面向口语练习与模型选型的一站式评测系统：统一评测标准、多维打分、多模型横向对比，覆盖「数据集 → 模型调用 → 评测分析 → 结果报告」全流程。
+
+[![GitHub](https://img.shields.io/github/m4rklee/ai-speak-eval-platform?style=flat-square)](https://github.com/m4rklee/ai-speak-eval-platform)
 
 ---
 
-## 一、背景 📖
+## 一、项目背景
 
-在口语教学与模型选型场景中，往往需要同时评估：
+大模型越来越多地用于口语练习与教学场景，但行业普遍面临三类问题：
 
-- **语音质量**（发音、流利度、自然度等）
-- **内容质量**（语法、主题、表达简洁等）
-- **听力理解**（听音频选答案、统计准确率）
-- **多模型差异**（并排对比、Prompt 变体实验）
+- **缺少统一评测标准**，不同实验难以在同一套尺度上对比；
+- **模型能力难横向比较**，语音好不好、内容是否切题、听力是否理解，往往分散在表格和临时脚本里；
+- **从出题到出报告链条长**，接入多家 API、批量跑测、汇总结果重复投入高。
 
-本平台将上述能力整合为一套前后端分离的评测系统，通过 **OpenRouter / AiHubMix** 调用各类多模态模型，并对接 **MultiPA + APG-MOS** 等语音评测引擎。
-
-**说明**
-- **数据集不随仓库发布**：内容评测题库、听力评测包需在本地自行配置，见 [`data/README.md`](data/README.md)
-
-**技术栈概览**
-
-| 层级 | 技术 |
-|------|------|
-| 前端 | Vue 3 · TypeScript · Vite · Ant Design Vue |
-| 后端 | FastAPI · SQLAlchemy · Redis Session |
-| 数据 | MySQL · Redis |
-| 模型 | OpenRouter · AiHubMix（支持 HTTP 代理） |
+本项目 **主导搭建** 一套 Web 评测平台，把数据集建设、评测维度设计、模型调用与结果分析收敛到同一产品，让教研与算法同学用浏览器即可完成实验，而不是每次从零拼装工具。
 
 ---
 
-## 二、功能 ✨
+## 二、项目亮点（与职责）
 
-| 模块 | 说明 |
+| 方向 | 说明 |
 |------|------|
-| 🎙️  **口语评测** | 语音评测、内容评测、综合评测 |
-| 🎧  **听力评测** | 支持随机抽题、进度展示、准确率与明细导出 |
-| 📚  **模型库** | 双平台模型同步，按输入/输出模态、价格等筛选 |
-| ⚖️ **模型对比** | 最多 8 个模型并排生成，支持图文音附件与人工偏好评分 |
-| 🧪  **Prompt Lab** | 单模型多提示词变体对比，可自动生成变体并记录实验结果 |
-| 🗂️  **场景管理** | 系统预设场景 + 自定义场景，支持 JSON 导入题目 |
-| 👥  **用户管理** | 管理员查看与管理用户（需 `admin` 角色） |
+| **平台规划与落地** | 从 0 到 1 设计口语评测产品形态，覆盖口语、听力、模型库、多模型对比、提示词实验等核心模块 |
+| **评测维度设计** | 将口语练习拆解为 **发音、流利、表达自然度、语法、主题聚焦、回答简洁度、听力理解** 等可解释维度，结合 **自训练/专用语音评测模型** 与 **大模型 Judge**，并 **自主设计评测提示词** |
+| **数据集建设** | 整理公开数据 **3000+ 条**；约 **40%** 音频通过语音合成替换为不同 **中式发音** 与 **流利度水平**，提升评测适用面；另采集 **真实对话数据 200 条** |
+| **模型与流程整合** | 接入 **AiHubMix、OpenRouter** 等主流 API 平台，打通模型调用、批量评测、进度跟踪与报告导出，实现 **一站式测评** |
+| **口语完整链路** | 支持「题目音频 → 模型生成回答 → 语音+内容综合评测」，既可分步使用，也可在一站式流程中完成 |
 
 ---
 
-## 三、使用方式 🚀
+## 三、产品能做什么
 
-### 3.1 环境要求 🛠️
+| 功能 | 用户价值 |
+|------|----------|
+| **口语评测** | 自动生成教师式回答，并从语音、内容两方面打分；支持综合评测与一站式流水线 |
+| **听力评测** | 听音选题，统计准确率，支持抽题与结果导出 |
+| **模型库** | 集中管理多家平台的对话/多模态模型，便于选型与比价 |
+| **模型对比** | 同一题目下多模型并排生成，支持人工偏好与横向比较 |
+| **Prompt Lab** | 同一模型、多种提示词变体对比，支撑提示词迭代 |
+| **场景管理** | 预设与自定义评测场景，服务批量实验 |
+| **用户与权限** | 多用户使用，管理员统一管理 |
 
-- Python 3.10+
-- Node.js 18+
-- MySQL、Redis
-- 口语 **语音评测** 需本机启动 MultiPA / APG-MOS 常驻服务（`scripts/eval-daemons.sh`）
+**典型流程（产品视角）**
 
-### 3.2 克隆与依赖 📦
-
-```bash
-git clone https://github.com/m4rklee/ai-speak-eval-platform.git
-cd ai-speak-eval-platform
-
-# 后端
-cd python-backend
-pip install -r requirements.txt
-cp .env.example .env   # 按需修改配置
-
-# 前端
-cd ../frontend
-npm install
+```text
+题目音频 → 模型生成回答（文本+语音）→ 语音维度评分 + 内容维度评分 → 对比表 / 导出报告
 ```
 
-### 3.3 初始化数据库 🗄️
+---
 
-```bash
-# 在项目根目录
-mysql -u root -p < sql/create_table.sql
-# 按需执行 sql/ 目录下其他迁移脚本
-```
+## 四、评测体系与数据
 
-### 3.4 配置本地数据 📁
+**多维评测（示例）**
 
-仓库 **不包含** 评测数据集，请本地准备：
+- **语音侧**：发音准确性、流利度、韵律/自然度等  
+- **内容侧**：语法准确表达、主题是否聚焦、回答是否简洁清晰  
+- **听力侧**：听音理解准确率  
+- **综合**：同一作答同时输出语音与内容评价，便于教学反馈与模型选型  
 
-```bash
-# 内容评测：题目文本
-mkdir -p data/questiontext
-# 将 *.txt 放入 data/questiontext/
+**数据建设思路**
 
-# 听力评测：在 python-backend/.env 中设置
-# LISTEN_EVAL_PACKAGE_DIR=/你的路径/北极星2201评测包
-```
+- 公开数据清洗与统一标注，规模 **3000+ 条**  
+- 合成数据增强：约 **40%** 音频替换为不同中式发音与流利度档位  
+- 真实场景补充：**200 条** 真实对话数据  
 
-详细说明见 [`data/README.md`](data/README.md)。
+---
 
-### 3.5 配置环境变量 🔑
+## 五、技术说明（简述）
 
-编辑 `python-backend/.env`，至少配置：
+采用前后端分离的 Web 架构：Vue 3 前端 + Python 后端，配合 MySQL / Redis 与多家大模型 API；语音评测对接专用发音与 MOS 评测能力，内容评测由大模型按统一提示词打分。
 
-| 变量 | 说明 |
-|------|------|
-| `OPENROUTER_API_KEY` | OpenRouter API Key |
-| `AIHUBMIX_API_KEY` | AiHubMix API Key |
-| `DB_*` / `REDIS_*` | 数据库与 Redis 连接 |
-| `OPENROUTER_HTTP_PROXY` | 可选，如 `http://127.0.0.1:7890` |
-| `LISTEN_EVAL_PACKAGE_DIR` | 听力评测包本地路径 |
-| `UNIFIED_EVAL_*` / `MULTIPA_*` / `APG_MOS_*` | 口语语音评测 daemon 相关 |
+| 类别 | 主要技术 |
+|------|----------|
+| 前端 | Vue 3、TypeScript |
+| 后端 | Python、FastAPI |
+| 大模型接入 | OpenRouter、AiHubMix |
+| 语音评测 | MultiPA、APG-MOS 等 |
 
-完整项见 `python-backend/.env.example`。
+本仓库为 **可演示、可部署的完整源码**；更细的接口与架构说明见 [`PROJECT.md`](PROJECT.md)。本地运行与环境配置仅供开发者参考，见仓库内 `scripts/` 与 `python-backend/.env.example`。
 
-### 3.6 启动服务 ▶️
+---
 
-```bash
-# 项目根目录
-bash scripts/restart-dev.sh all
-```
+## 相关链接
 
-| 服务 | 地址 |
-|------|------|
-| 前端 | http://localhost:6006 |
-| 后端 API | http://localhost:6008 |
-| 健康检查 | http://localhost:6008/api/health |
-
-常用命令：
-
-```bash
-bash scripts/restart-dev.sh frontend   # 仅重启前端
-bash scripts/restart-dev.sh backend    # 仅重启后端
-bash scripts/restart-dev.sh daemons    # 仅管理评测 daemon
-```
-
-### 3.7 登录与使用 👤
-
-1. 浏览器打开前端地址，注册或使用种子账号登录（见 `sql/create_table.sql`）
-2. 在 **模型库** 同步模型后，进入各评测页面选择模型并提交任务
-3. 管理员可访问 **用户管理** 页面
-
-> 部署到生产环境后请修改默认密码，且勿将 `.env` 提交到 Git。
-
-### 3.8 目录结构 📂
-
-```
-├── frontend/          # Vue 前端
-├── python-backend/    # FastAPI 后端
-├── data/              # 本地题库（gitignore）
-├── sql/               # 数据库脚本
-└── scripts/           # 启动与 daemon 脚本
-```
-
-完整的架构与 API 文档见 [`PROJECT.md`](PROJECT.md)。                                              
+- **代码仓库**：https://github.com/m4rklee/ai-speak-eval-platform  
+- **技术文档**：[`PROJECT.md`](PROJECT.md)

@@ -17,6 +17,9 @@ FRONTEND_LOG="/root/autodl-tmp/.ai-eval-logs/frontend.log"
 
 mkdir -p "$PID_DIR" "$(dirname "$BACKEND_LOG")"
 
+# shellcheck source=ensure-infra.sh
+source "$(dirname "$0")/ensure-infra.sh"
+
 port_open() {
   "$PYTHON" -c "import socket; s=socket.socket(); exit(0 if s.connect_ex(('127.0.0.1',$1))==0 else 1)" 2>/dev/null
 }
@@ -101,6 +104,8 @@ start_frontend() {
 }
 
 cmd_start() {
+  echo "=== 基础服务 (MariaDB + Redis) ==="
+  ensure_db_infra
   echo "=== 评测 daemon ==="
   bash "$(dirname "$0")/eval-daemons.sh" start --wait
   start_backend

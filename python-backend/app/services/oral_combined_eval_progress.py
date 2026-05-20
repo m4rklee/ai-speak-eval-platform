@@ -17,6 +17,11 @@ SPEECH_PROGRESS_HI = 50
 CONTENT_PROGRESS_LO = 50
 CONTENT_PROGRESS_HI = 99
 
+PIPELINE_GEN_PROGRESS_LO = 0
+PIPELINE_GEN_PROGRESS_HI = 45
+PIPELINE_EVAL_PROGRESS_LO = 45
+PIPELINE_EVAL_PROGRESS_HI = 99
+
 
 def job_key(job_id: str) -> str:
     return f"{JOB_KEY_PREFIX}{job_id}"
@@ -49,12 +54,68 @@ def _format_duration(sec: float) -> str:
     return f"{m}:{s:02d}"
 
 
-class OralCombinedProgressReporter:
-    """并行语音+内容：语音占 0–50%，内容占 50–100%。"""
+class PipelineGenProgressReporter:
+    """一站式：回复生成阶段，进度 0–45%。"""
 
-    def __init__(self, job_id: str, total_pairs: int) -> None:
+    def __init__(self, job_id: str, total: int) -> None:
+        self.job_id = job_id
+        self.total = max(1, total)
+        self.started_at = time.time()
+
+    async def update(self, current: int, message: str = "") -> None:
+        redis = get_redis()
+        raw = await redis.get(job_key(self.job_id))
+        if not raw:
+            return
+        payload = json.loads(raw)
+        elapsed = time.time() - self.started_at
+        pct = (
+            int(min(PIPELINE_GEN_PROGRESS_HI - 1, (current / self.total) * PIPELINE_GEN_PROGRESS_HI))
+            if current < self.total
+            else PIPELINE_GEN_PROGRESS_HI
+        )
+        elapsed_text = _format_duration(elapsed)
+        tqdm_line = f"回复生成 [{current}/{self.total}] {pct}% | {elapsed_text}"
+        if message:
+            tqdm_line += f" | {message}"
+        payload["progress"] = pct
+        payload["status"] = "generating"
+        payload["progress_detail"] = {
+            "phase": "generating",
+            "phase_label": "回复生成",
+            "current": current,
+            "total": self.total,
+            "elapsed_sec": round(elapsed, 1),
+            "elapsed_text": elapsed_text,
+            "message": message,
+            "tqdm_line": tqdm_line,
+        }
+        await redis.set(
+            job_key(self.job_id),
+            json.dumps(payload, ensure_ascii=False),
+            ex=JOB_TTL_SEC,
+        )
+
+
+class OralCombinedProgressReporter:
+    """并行语音+内容：语音占 progress_lo–mid%，内容占 mid–progress_hi。"""
+
+    def __init__(
+        self,
+        job_id: str,
+        total_pairs: int,
+        *,
+        progress_lo: int = SPEECH_PROGRESS_LO,
+        progress_hi: int = CONTENT_PROGRESS_HI,
+    ) -> None:
         self.job_id = job_id
         self.total_pairs = max(1, total_pairs)
+        self.progress_lo = progress_lo
+        self.progress_hi = progress_hi
+        self.speech_lo = progress_lo
+        self.speech_hi = progress_lo + (progress_hi - progress_lo) // 2
+        self.content_lo = self.speech_hi
+        self.content_hi = progress_hi
         self.started_at = time.time()
         self._speech_done = False
         self._content_done = False
@@ -100,12 +161,14 @@ class OralCombinedProgressReporter:
         return min(1.0, self._content_current / self.total_pairs)
 
     def _calc_progress(self, live: Optional[dict[str, Any]]) -> int:
-        speech_part = self._speech_fraction(live) * (SPEECH_PROGRESS_HI - SPEECH_PROGRESS_LO)
-        content_part = self._content_fraction() * (CONTENT_PROGRESS_HI - CONTENT_PROGRESS_LO)
-        total = SPEECH_PROGRESS_LO + speech_part + (CONTENT_PROGRESS_LO - SPEECH_PROGRESS_HI) + content_part
+        speech_span = max(1, self.speech_hi - self.speech_lo)
+        content_span = max(1, self.content_hi - self.content_lo)
+        speech_part = self._speech_fraction(live) * speech_span
+        content_part = self._content_fraction() * content_span
+        total = self.speech_lo + speech_part + (self.content_lo - self.speech_hi) + content_part
         if self._speech_done and self._content_done:
             return 100
-        return min(99, int(total))
+        return min(self.progress_hi, max(self.progress_lo, int(total)))
 
     def _build_detail(self, live: Optional[dict[str, Any]]) -> dict[str, Any]:
         elapsed = time.time() - self.started_at

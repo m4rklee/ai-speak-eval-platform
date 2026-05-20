@@ -39,9 +39,10 @@ import {
   type OralCombinedJob,
 } from '@/api/oralCombinedEvalController'
 import { listListenEvalJobs, type ListenEvalJob } from '@/api/listenEvalController'
+import { listOralGenJobs, type OralGenJob } from '@/api/oralGenController'
 import { listUnifiedEvalJobs, type UnifiedEvalJob } from '@/api/unifiedEvalController'
 
-export type EvalRecentKind = 'speech' | 'content' | 'combined' | 'listening'
+export type EvalRecentKind = 'oral_gen' | 'speech' | 'content' | 'combined' | 'listening'
 
 export type EvalRecentJobItem = {
   kind: EvalRecentKind
@@ -64,6 +65,7 @@ const recentFilter = ref<'all' | EvalRecentKind>('all')
 
 const recentFilterOptions = [
   { label: '全部', value: 'all' },
+  { label: '回复生成', value: 'oral_gen' },
   { label: '语音', value: 'speech' },
   { label: '内容', value: 'content' },
   { label: '综合', value: 'combined' },
@@ -103,9 +105,20 @@ function formatContentDescription(item: ContentEvalJob) {
 }
 
 function formatCombinedDescription(item: OralCombinedJob) {
-  const parts = [`${item.totalFiles} 组成对`, item.status]
+  const parts: string[] = []
+  if (item.pipelineMode) parts.push('一站式')
+  parts.push(`${item.totalFiles} 组成对`, item.status)
   if (item.summary?.okCount != null) {
     parts.push(`成功 ${item.summary.okCount}`)
+  }
+  if (item.createdAt) parts.push(item.createdAt)
+  return parts.join(' · ')
+}
+
+function formatOralGenDescription(item: OralGenJob) {
+  const parts = [`${item.totalSamples} 条`, item.status]
+  if (item.summary?.success != null) {
+    parts.push(`成功 ${item.summary.success}`)
   }
   if (item.createdAt) parts.push(item.createdAt)
   return parts.join(' · ')
@@ -122,6 +135,7 @@ function formatListenDescription(item: ListenEvalJob) {
 
 function kindLabel(kind: EvalRecentKind) {
   const map: Record<EvalRecentKind, string> = {
+    oral_gen: '回复生成',
     speech: '语音',
     content: '内容',
     combined: '综合',
@@ -131,6 +145,7 @@ function kindLabel(kind: EvalRecentKind) {
 }
 
 function kindTagColor(kind: EvalRecentKind) {
+  if (kind === 'oral_gen') return 'geekblue'
   if (kind === 'speech') return 'blue'
   if (kind === 'content') return 'purple'
   if (kind === 'combined') return 'cyan'
@@ -165,12 +180,22 @@ async function loadRecentJobs() {
   }
   recentLoading.value = true
   try {
-    const [uniData, contentData, combinedData, listenData] = await Promise.all([
+    const [oralGenData, uniData, contentData, combinedData, listenData] = await Promise.all([
+      listOralGenJobs().catch(() => ({ jobs: [] as OralGenJob[] })),
       listUnifiedEvalJobs().catch(() => ({ jobs: [] as UnifiedEvalJob[] })),
       listContentEvalJobs().catch(() => ({ jobs: [] as ContentEvalJob[] })),
       listOralCombinedJobs().catch(() => ({ jobs: [] as OralCombinedJob[] })),
       listListenEvalJobs().catch(() => ({ jobs: [] as ListenEvalJob[] })),
     ])
+    const oralGen: EvalRecentJobItem[] = (oralGenData.jobs || []).map((item) => ({
+      kind: 'oral_gen' as const,
+      jobId: item.jobId,
+      title: formatJobId(item.jobId),
+      description: formatOralGenDescription(item),
+      status: item.status,
+      createdAt: item.createdAt || '',
+      sortKey: parseTime(item.createdAt),
+    }))
     const speech: EvalRecentJobItem[] = (uniData.jobs || []).map((item) => ({
       kind: 'speech' as const,
       jobId: item.jobId,
@@ -207,7 +232,7 @@ async function loadRecentJobs() {
       createdAt: item.createdAt || '',
       sortKey: parseTime(item.createdAt),
     }))
-    recentJobs.value = [...speech, ...content, ...combined, ...listening].sort(
+    recentJobs.value = [...oralGen, ...speech, ...content, ...combined, ...listening].sort(
       (a, b) => b.sortKey - a.sortKey,
     )
   } catch {

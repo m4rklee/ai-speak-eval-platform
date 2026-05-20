@@ -98,7 +98,7 @@
                 <FolderOpenOutlined />
                 选择文件夹（含 wav）
               </a-button>
-              <span v-if="dirFiles.length" class="hint">已选 {{ dirFiles.length }} 个 wav</span>
+              <span v-if="dirFiles.length" class="hint">{{ dirSelectionHint }}</span>
             </div>
             <a-upload
               :multiple="false"
@@ -185,7 +185,15 @@
             </a-space>
             <p class="hint">
               <span v-if="slot.zipFile">已选 zip：{{ slot.zipFile.name }}</span>
-              <span v-else>已选 {{ slot.files.length || slot.dirFiles.length }} 个 wav</span>
+              <span v-else-if="slot.dirFiles.length && slot.dirFolderName">
+                已选文件夹「{{ slot.dirFolderName }}」· {{ slot.dirFiles.length }} 个 wav
+              </span>
+              <span v-else-if="slot.files.length">
+                已选 {{ slot.files.length }} 个 wav
+              </span>
+              <span v-else-if="slot.dirFiles.length">
+                已选 {{ slot.dirFiles.length }} 个 wav
+              </span>
             </p>
           </div>
           <a-space style="margin-top: 12px">
@@ -357,12 +365,21 @@ const singleLoading = ref(false)
 const multiFiles = ref<File[]>([])
 const multiFileList = ref<UploadProps['fileList']>([])
 const dirFiles = ref<File[]>([])
+const dirFolderName = ref('')
 const zipFile = ref<File | null>(null)
 const dirInputRef = ref<HTMLInputElement | null>(null)
 const jobLoading = ref(false)
 const multiModelLoading = ref(false)
 const maxModelsPerJob = 10
 let slotIdSeq = 0
+
+function folderNameFromFileList(files: File[]): string {
+  if (!files.length) return ''
+  const rel = (files[0] as File & { webkitRelativePath?: string }).webkitRelativePath || ''
+  const normalized = rel.replace(/\\/g, '/')
+  const slash = normalized.indexOf('/')
+  return slash > 0 ? normalized.slice(0, slash) : ''
+}
 
 function createEmptySlot(): ModelEvalSlot {
   return {
@@ -371,6 +388,7 @@ function createEmptySlot(): ModelEvalSlot {
     files: [],
     fileList: [],
     dirFiles: [],
+    dirFolderName: '',
     zipFile: null,
   }
 }
@@ -564,6 +582,7 @@ function onSlotMultiBeforeUpload(slotId: string, file: File) {
   }
   slot.zipFile = null
   slot.dirFiles = []
+  slot.dirFolderName = ''
   slot.files.push(file)
   slot.fileList = [
     ...(slot.fileList || []),
@@ -590,7 +609,9 @@ function onSlotDirChange(slotId: string, e: Event) {
   slot.files = []
   slot.fileList = []
   slot.dirFiles = Array.from(list).filter((f) => f.name.toLowerCase().endsWith('.wav'))
-  message.info(`已选择 ${slot.dirFiles.length} 个 wav 文件`)
+  slot.dirFolderName = folderNameFromFileList(slot.dirFiles)
+  const folderLabel = slot.dirFolderName ? `文件夹「${slot.dirFolderName}」` : '文件夹'
+  message.info(`已选择 ${folderLabel}，共 ${slot.dirFiles.length} 个 wav`)
   input.value = ''
 }
 
@@ -601,6 +622,7 @@ function onSlotZipBeforeUpload(slotId: string, file: File) {
   slot.files = []
   slot.fileList = []
   slot.dirFiles = []
+  slot.dirFolderName = ''
   return false
 }
 
@@ -626,6 +648,13 @@ function removeModelSlot(id: string) {
   modelSlots.value = modelSlots.value.filter((s) => s.id !== id)
   delete slotDirRefs.value[id]
 }
+
+const dirSelectionHint = computed(() => {
+  const n = dirFiles.value.length
+  if (!n) return ''
+  const name = dirFolderName.value
+  return name ? `已选文件夹「${name}」· ${n} 个 wav` : `已选 ${n} 个 wav`
+})
 
 const totalMultiModelFiles = computed(() =>
   modelSlots.value.reduce((sum, slot) => {
@@ -776,12 +805,16 @@ function onDirChange(e: Event) {
   const list = input.files
   if (!list) return
   dirFiles.value = Array.from(list).filter((f) => f.name.toLowerCase().endsWith('.wav'))
-  message.info(`已选择 ${dirFiles.value.length} 个 wav 文件`)
+  dirFolderName.value = folderNameFromFileList(dirFiles.value)
+  const folderLabel = dirFolderName.value ? `文件夹「${dirFolderName.value}」` : '文件夹'
+  message.info(`已选择 ${folderLabel}，共 ${dirFiles.value.length} 个 wav`)
   input.value = ''
 }
 
 const onZipBeforeUpload: UploadProps['beforeUpload'] = (file) => {
   zipFile.value = file as File
+  dirFiles.value = []
+  dirFolderName.value = ''
   return false
 }
 

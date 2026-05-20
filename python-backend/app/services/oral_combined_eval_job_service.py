@@ -13,7 +13,7 @@ import uuid
 import zipfile
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from fastapi import UploadFile
 
@@ -28,10 +28,22 @@ from app.services.oral_eval.unified_eval_runner import (
 )
 from app.services.oral_combined_eval_progress import (
     JOB_TTL_SEC,
+    PIPELINE_EVAL_PROGRESS_HI,
+    PIPELINE_EVAL_PROGRESS_LO,
+    PIPELINE_GEN_PROGRESS_HI,
     OralCombinedProgressReporter,
+    PipelineGenProgressReporter,
     job_key,
     progress_detail_vo,
 )
+from app.services.oral_gen.questionwav import health_check as oral_gen_health_check
+from app.services.oral_gen.questionwav import sample_items, stem_from_path
+from app.services.oral_gen.runner import (
+    generate_reply,
+    persist_result_flat,
+    validate_api_configured,
+)
+from app.utils.model_id import normalize_model_id
 from app.services.unified_eval_job_service import _per_file_to_row
 from app.utils.content_eval_questions import validate_question_dir
 
@@ -43,6 +55,14 @@ MAX_FILES_PER_JOB = 200
 MAX_WAV_BYTES = 50 * 1024 * 1024
 MAX_TXT_BYTES = 2 * 1024 * 1024
 AUDIO_CACHE_ROOT = "/tmp/oral_combined_audio"
+
+
+def _pipeline_work_dir(job_id: str) -> str:
+    return os.path.join(get_settings().ORAL_COMBINED_WORK_ROOT, job_id)
+
+
+def _oral_gen_job_dir(oral_gen_job_id: str) -> str:
+    return os.path.join(get_settings().ORAL_GEN_OUTPUT_ROOT, oral_gen_job_id)
 
 _SAFE_NAME = re.compile(r"[^a-zA-Z0-9._\-]")
 
@@ -358,18 +378,57 @@ def _archive_combined_audio(work_dir: str, job_id: str) -> Optional[str]:
 
 def _job_vo_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
     result = payload.get("result") or {}
+    summary = payload.get("summary") or result.get("summary")
+    if summary and payload.get("gen_summary") and isinstance(summary, dict):
+        summary = {**summary, "genSummary": payload.get("gen_summary")}
     return {
         "jobId": payload.get("job_id", ""),
         "status": payload.get("status", "pending"),
         "progress": payload.get("progress", 0),
         "totalFiles": payload.get("total_files", 0),
         "error": payload.get("error"),
-        "summary": payload.get("summary") or result.get("summary"),
+        "summary": summary,
         "perFile": payload.get("per_file_rows") or result.get("perFile"),
         "createdAt": payload.get("created_at"),
         "finishedAt": payload.get("finished_at"),
         "progressDetail": progress_detail_vo(payload.get("progress_detail")),
-        "audioAvailable": bool(payload.get("audio_dir")),
+        "audioAvailable": bool(payload.get("audio_dir"))
+        or bool(payload.get("work_dir")),
+        "pipelineMode": bool(payload.get("pipeline_mode")),
+        "model": payload.get("model"),
+        "genRows": payload.get("gen_rows"),
+        "genSummary": payload.get("gen_summary"),
+        "autoStartEval": payload.get("auto_start_eval"),
+    }
+
+
+def _pairs_from_gen_rows(gen_rows: list[dict[str, Any]]) -> list[dict[str, str]]:
+    pairs: list[dict[str, str]] = []
+    for row in gen_rows:
+        if row.get("error") or not row.get("hasAudio"):
+            continue
+        stem = row.get("stem", "")
+        if not stem:
+            continue
+        pairs.append(
+            {
+                "stem": stem,
+                "wavName": f"{stem}.wav",
+                "txtName": f"{stem}.txt",
+            }
+        )
+    return pairs
+
+
+def _gen_summary_from_rows(gen_rows: list[dict[str, Any]], eval_skipped: int = 0) -> dict[str, Any]:
+    total = len(gen_rows)
+    failed = sum(1 for r in gen_rows if r.get("error"))
+    success = sum(1 for r in gen_rows if not r.get("error") and r.get("hasAudio"))
+    return {
+        "total": total,
+        "success": success,
+        "failed": failed,
+        "evalSkipped": eval_skipped,
     }
 
 
@@ -386,6 +445,7 @@ class OralCombinedEvalJobService:
             msg = (
                 f"{paths_msg}; " if paths_msg else ""
             ) + "评测 daemon 未就绪，请执行 bash scripts/eval-daemons.sh restart"
+        og = oral_gen_health_check()
         return {
             "pathsOk": paths_ok,
             "pathsMessage": msg,
@@ -397,6 +457,9 @@ class OralCombinedEvalJobService:
             "judgeModel": get_settings().ORAL_EVAL_JUDGE_MODEL,
             "maxFilesPerJob": _max_files(),
             "engine": "daemon",
+            "oralGenReady": bool(og.get("ready")),
+            "questionwavCount": int(og.get("wav_count") or 0),
+            "oralGenMessage": og.get("message") or "",
         }
 
     @staticmethod
@@ -488,14 +551,350 @@ class OralCombinedEvalJobService:
             raise e
 
     @staticmethod
-    async def _run_job(job_id: str, work_dir: str, pairs: list[dict[str, str]]) -> None:
+    async def _assert_eval_ready() -> dict[str, Any]:
+        h = await OralCombinedEvalJobService.health_async()
+        if not h["pathsOk"]:
+            raise BusinessException(ErrorCode.OPERATION_ERROR, h["pathsMessage"])
+        if not h["daemonReady"]:
+            raise BusinessException(ErrorCode.OPERATION_ERROR, h["pathsMessage"])
+        if not h["questionDirOk"]:
+            raise BusinessException(ErrorCode.OPERATION_ERROR, h["questionDirMessage"])
+        return h
+
+    @staticmethod
+    async def create_pipeline_job(
+        user_id: int,
+        *,
+        model: str,
+        source: Literal["builtin", "upload"],
+        sample_mode: Literal["all", "random"] = "random",
+        sample_count: int = 2,
+        seed: Optional[int] = None,
+        request_interval: Optional[float] = None,
+        auto_start_eval: bool = True,
+        files: Optional[list[UploadFile]] = None,
+    ) -> str:
+        await OralCombinedEvalJobService._assert_eval_ready()
+        validate_api_configured()
+        og = oral_gen_health_check()
+        if source == "builtin":
+            if not og.get("questionwav_dir_ok") or not og.get("wav_count"):
+                raise BusinessException(
+                    ErrorCode.OPERATION_ERROR,
+                    og.get("message") or "内置题目音频不可用",
+                )
+            try:
+                items = sample_items(mode=sample_mode, count=sample_count, seed=seed)
+            except (ValueError, FileNotFoundError) as e:
+                raise BusinessException(ErrorCode.PARAMS_ERROR, str(e)) from e
+        else:
+            if not files:
+                raise BusinessException(ErrorCode.PARAMS_ERROR, "请上传题目 wav")
+            job_id = uuid.uuid4().hex
+            work_dir = _pipeline_work_dir(job_id)
+            input_dir = os.path.join(work_dir, "input")
+            os.makedirs(input_dir, exist_ok=True)
+            items = []
+            max_n = get_settings().ORAL_GEN_MAX_SAMPLES_PER_JOB
+            for uf in files:
+                if len(items) >= max_n:
+                    break
+                name = (uf.filename or "audio.wav").replace("/", "_").replace("\\", "_")
+                if not name.lower().endswith(".wav"):
+                    name = f"{stem_from_path(name)}.wav"
+                content = await uf.read()
+                if not content:
+                    continue
+                dest = os.path.join(input_dir, name)
+                with open(dest, "wb") as f:
+                    f.write(content)
+                items.append({"stem": stem_from_path(name), "path": dest})
+            if not items:
+                shutil.rmtree(work_dir, ignore_errors=True)
+                raise BusinessException(ErrorCode.PARAMS_ERROR, "无有效 wav 文件")
+            return await OralCombinedEvalJobService._create_pipeline_internal(
+                user_id,
+                model=model,
+                source=source,
+                sample_mode=sample_mode if source == "builtin" else "upload",
+                items=items,
+                request_interval=request_interval,
+                auto_start_eval=auto_start_eval,
+                existing_job_id=job_id,
+                work_dir=work_dir,
+            )
+
+        return await OralCombinedEvalJobService._create_pipeline_internal(
+            user_id,
+            model=model,
+            source=source,
+            sample_mode=sample_mode,
+            items=items,
+            request_interval=request_interval,
+            auto_start_eval=auto_start_eval,
+        )
+
+    @staticmethod
+    async def _create_pipeline_internal(
+        user_id: int,
+        *,
+        model: str,
+        source: str,
+        sample_mode: str,
+        items: list[dict[str, Any]],
+        request_interval: Optional[float],
+        auto_start_eval: bool,
+        existing_job_id: Optional[str] = None,
+        work_dir: Optional[str] = None,
+    ) -> str:
+        settings = get_settings()
+        job_id = existing_job_id or uuid.uuid4().hex
+        work_dir = work_dir or _pipeline_work_dir(job_id)
+        os.makedirs(work_dir, exist_ok=True)
+        interval = (
+            request_interval
+            if request_interval is not None
+            else settings.ORAL_GEN_REQUEST_INTERVAL_SEC
+        )
+        interval = max(0.0, float(interval))
+        now = datetime.now().isoformat(timespec="seconds")
+        payload = {
+            "job_id": job_id,
+            "user_id": user_id,
+            "status": "pending",
+            "progress": 0,
+            "total_files": len(items),
+            "pipeline_mode": True,
+            "model": normalize_model_id(model),
+            "source": source,
+            "sample_mode": sample_mode,
+            "request_interval": interval,
+            "auto_start_eval": auto_start_eval,
+            "gen_items": items,
+            "work_dir": work_dir,
+            "created_at": now,
+            "finished_at": None,
+            "error": None,
+            "gen_rows": None,
+            "gen_summary": None,
+        }
+        await _save_job(job_id, payload)
+        await _push_user_job(user_id, job_id)
+        asyncio.create_task(
+            OralCombinedEvalJobService._run_pipeline_generation(job_id, interval)
+        )
+        return job_id
+
+    @staticmethod
+    async def create_from_oral_gen(
+        user_id: int,
+        oral_gen_job_id: str,
+        *,
+        auto_start_eval: bool = True,
+    ) -> str:
+        await OralCombinedEvalJobService._assert_eval_ready()
+        from app.services.oral_gen_job_service import OralGenJobService
+
+        og_payload = await OralGenJobService.get_job(oral_gen_job_id, user_id)
+        if og_payload.get("status") not in ("completed",):
+            raise BusinessException(
+                ErrorCode.OPERATION_ERROR,
+                "回复生成任务尚未完成，无法导入",
+            )
+        og_dir = _oral_gen_job_dir(oral_gen_job_id)
+        if not os.path.isdir(og_dir):
+            raise BusinessException(ErrorCode.NOT_FOUND_ERROR, "回复生成结果目录不存在")
+
+        job_id = uuid.uuid4().hex
+        work_dir = _pipeline_work_dir(job_id)
+        os.makedirs(work_dir, exist_ok=True)
+        gen_rows: list[dict[str, Any]] = []
+        audio_dir = os.path.join(og_dir, "audio")
+        text_dir = os.path.join(og_dir, "text")
+        if os.path.isdir(audio_dir):
+            for name in sorted(os.listdir(audio_dir)):
+                if not name.lower().endswith(".wav"):
+                    continue
+                stem = Path(name).stem
+                src_wav = os.path.join(audio_dir, name)
+                src_txt = os.path.join(text_dir, f"{stem}.txt")
+                row: dict[str, Any] = {
+                    "stem": stem,
+                    "text": "",
+                    "hasAudio": False,
+                    "error": None,
+                }
+                if os.path.isfile(src_txt):
+                    with open(src_txt, encoding="utf-8") as f:
+                        txt = f.read().strip()
+                    if txt.startswith("[ERROR]"):
+                        row["error"] = txt[8:].strip()
+                    else:
+                        row["text"] = txt
+                if os.path.isfile(src_wav) and not row.get("error"):
+                    shutil.copy2(src_wav, os.path.join(work_dir, f"{stem}.wav"))
+                    if os.path.isfile(src_txt):
+                        shutil.copy2(src_txt, os.path.join(work_dir, f"{stem}.txt"))
+                    row["hasAudio"] = True
+                gen_rows.append(row)
+
+        if not gen_rows:
+            shutil.rmtree(work_dir, ignore_errors=True)
+            raise BusinessException(ErrorCode.PARAMS_ERROR, "回复生成任务无可用结果")
+
+        now = datetime.now().isoformat(timespec="seconds")
+        pairs = _pairs_from_gen_rows(gen_rows)
+        payload = {
+            "job_id": job_id,
+            "user_id": user_id,
+            "status": "awaiting_eval" if not auto_start_eval else "pending",
+            "progress": PIPELINE_GEN_PROGRESS_HI if auto_start_eval else PIPELINE_GEN_PROGRESS_HI,
+            "total_files": len(pairs),
+            "pipeline_mode": True,
+            "model": og_payload.get("model"),
+            "source": "oral_gen_import",
+            "oral_gen_job_id": oral_gen_job_id,
+            "auto_start_eval": auto_start_eval,
+            "work_dir": work_dir,
+            "gen_rows": gen_rows,
+            "gen_summary": _gen_summary_from_rows(
+                gen_rows, eval_skipped=len(gen_rows) - len(pairs)
+            ),
+            "pairs": pairs,
+            "created_at": now,
+            "finished_at": None,
+            "error": None,
+        }
+        await _save_job(job_id, payload)
+        await _push_user_job(user_id, job_id)
+        if auto_start_eval:
+            asyncio.create_task(
+                OralCombinedEvalJobService._run_eval_phase(job_id, work_dir, pairs)
+            )
+        return job_id
+
+    @staticmethod
+    async def continue_pipeline(job_id: str, user_id: int) -> None:
+        payload = await _load_job(job_id)
+        if not payload:
+            raise BusinessException(ErrorCode.NOT_FOUND_ERROR, "任务不存在")
+        if payload.get("user_id") != user_id:
+            raise BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限")
+        if payload.get("status") != "awaiting_eval":
+            raise BusinessException(ErrorCode.OPERATION_ERROR, "任务不在待评测状态")
+        work_dir = payload.get("work_dir")
+        if not work_dir or not os.path.isdir(work_dir):
+            raise BusinessException(ErrorCode.OPERATION_ERROR, "工作目录不可用")
+        gen_rows = payload.get("gen_rows") or []
+        pairs = _pairs_from_gen_rows(gen_rows)
+        if not pairs:
+            raise BusinessException(
+                ErrorCode.OPERATION_ERROR,
+                "无成功生成的样本可评测，请检查生成结果",
+            )
+        payload["pairs"] = pairs
+        payload["total_files"] = len(pairs)
+        payload["status"] = "pending"
+        await _save_job(job_id, payload)
+        asyncio.create_task(
+            OralCombinedEvalJobService._run_eval_phase(job_id, work_dir, pairs)
+        )
+
+    @staticmethod
+    async def _run_pipeline_generation(job_id: str, interval: float) -> None:
+        payload = await _load_job(job_id)
+        if not payload:
+            return
+        items: list[dict[str, Any]] = payload.get("gen_items") or []
+        model = payload.get("model", "")
+        work_dir = payload.get("work_dir") or _pipeline_work_dir(job_id)
+        os.makedirs(work_dir, exist_ok=True)
+        auto_start = bool(payload.get("auto_start_eval", True))
+        reporter = PipelineGenProgressReporter(job_id, len(items))
+        gen_rows: list[dict[str, Any]] = []
+
+        payload["status"] = "generating"
+        await _save_job(job_id, payload)
+
+        try:
+            for idx, item in enumerate(items, start=1):
+                stem = str(item.get("stem", ""))[:48]
+                wav_path = item.get("path", "")
+                await reporter.update(idx - 1, message=stem)
+                raw = await generate_reply(model, wav_path)
+                vo = persist_result_flat(work_dir, raw)
+                gen_rows.append(vo)
+                await reporter.update(idx, message=stem)
+                if interval > 0 and idx < len(items):
+                    await asyncio.sleep(interval)
+        except Exception as e:
+            logger.exception("Pipeline gen failed job=%s", job_id)
+            payload = await _load_job(job_id) or payload
+            payload["status"] = "failed"
+            payload["error"] = str(e)[:500]
+            payload["gen_rows"] = gen_rows
+            payload["finished_at"] = datetime.now().isoformat(timespec="seconds")
+            await _save_job(job_id, payload)
+            return
+
+        pairs = _pairs_from_gen_rows(gen_rows)
+        eval_skipped = len(gen_rows) - len(pairs)
+        gen_summary = _gen_summary_from_rows(gen_rows, eval_skipped=eval_skipped)
+
+        payload = await _load_job(job_id) or payload
+        payload["gen_rows"] = gen_rows
+        payload["gen_summary"] = gen_summary
+        payload["pairs"] = pairs
+        payload["total_files"] = len(pairs)
+        payload.pop("gen_items", None)
+
+        if not pairs:
+            payload["status"] = "failed"
+            payload["error"] = "全部样本生成失败，无法进入综合评测"
+            payload["progress"] = 100
+            payload["finished_at"] = datetime.now().isoformat(timespec="seconds")
+            await _save_job(job_id, payload)
+            return
+
+        if auto_start:
+            await _save_job(job_id, payload)
+            await OralCombinedEvalJobService._run_eval_phase(job_id, work_dir, pairs)
+        else:
+            payload["status"] = "awaiting_eval"
+            payload["progress"] = PIPELINE_GEN_PROGRESS_HI
+            detail = payload.get("progress_detail") or {}
+            detail["phase"] = "awaiting_eval"
+            detail["phase_label"] = "待确认评测"
+            detail["tqdm_line"] = (
+                f"生成完成，成功 {gen_summary['success']}/{gen_summary['total']}，"
+                "请预览后点击开始综合评测"
+            )
+            payload["progress_detail"] = detail
+            await _save_job(job_id, payload)
+
+    @staticmethod
+    async def _run_eval_phase(
+        job_id: str,
+        work_dir: str,
+        pairs: list[dict[str, str]],
+    ) -> None:
         payload = await _load_job(job_id)
         if not payload:
             shutil.rmtree(work_dir, ignore_errors=True)
             return
 
-        reporter = OralCombinedProgressReporter(job_id, len(pairs))
+        progress_lo = PIPELINE_EVAL_PROGRESS_LO if payload.get("pipeline_mode") else 0
+        progress_hi = PIPELINE_EVAL_PROGRESS_HI if payload.get("pipeline_mode") else 99
+
+        reporter = OralCombinedProgressReporter(
+            job_id,
+            len(pairs),
+            progress_lo=progress_lo,
+            progress_hi=progress_hi,
+        )
         await reporter.start()
+        payload["status"] = "running"
+        await _save_job(job_id, payload)
 
         speech_merged: dict[str, Any] = {}
         content_rows: list[dict[str, Any]] = []
@@ -557,6 +956,9 @@ class OralCombinedEvalJobService:
             )
 
         summary = _compute_summary(merged_rows)
+        if payload.get("gen_summary") and isinstance(summary, dict):
+            summary["genSummary"] = payload.get("gen_summary")
+
         success = not run_error and any(r.get("status") in ("ok", "partial") for r in merged_rows)
 
         payload = await _load_job(job_id) or payload
@@ -584,6 +986,11 @@ class OralCombinedEvalJobService:
         payload.pop("work_dir", None)
         payload.pop("pairs", None)
         await _save_job(job_id, payload)
+
+    @staticmethod
+    async def _run_job(job_id: str, work_dir: str, pairs: list[dict[str, str]]) -> None:
+        await OralCombinedEvalJobService._run_eval_phase(job_id, work_dir, pairs)
+        shutil.rmtree(work_dir, ignore_errors=True)
 
     @staticmethod
     async def get_job(job_id: str, user_id: int) -> dict[str, Any]:
@@ -616,9 +1023,13 @@ class OralCombinedEvalJobService:
         if not safe.lower().endswith(".wav"):
             raise BusinessException(ErrorCode.PARAMS_ERROR, "仅支持 wav 文件")
         audio_dir = payload.get("audio_dir")
-        if not audio_dir:
-            raise BusinessException(ErrorCode.NOT_FOUND_ERROR, "该任务未保留音频")
-        path = os.path.join(audio_dir, safe)
-        if not os.path.isfile(path):
-            raise BusinessException(ErrorCode.NOT_FOUND_ERROR, f"音频不存在: {safe}")
-        return path
+        if audio_dir:
+            path = os.path.join(audio_dir, safe)
+            if os.path.isfile(path):
+                return path
+        work_dir = payload.get("work_dir")
+        if work_dir:
+            path = os.path.join(work_dir, safe)
+            if os.path.isfile(path):
+                return path
+        raise BusinessException(ErrorCode.NOT_FOUND_ERROR, f"音频不存在: {safe}")

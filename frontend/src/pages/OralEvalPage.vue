@@ -4,11 +4,14 @@
       <PageTitle
         icon-key="oral-eval"
         title="口语评测"
-        subtitle="语音：MultiPA + APG-MOS 发音与自然度；内容：大模型 Judge 三维文本评分（语法 / 主题 / 简洁）"
+        subtitle="回复生成 | 综合评测（一站式）| 语音/内容评测"
       />
     </div>
 
     <a-tabs v-model:activeKey="mainTab" class="main-tabs" @change="onMainTabChange">
+      <a-tab-pane key="generate" tab="回复生成">
+        <OralGenPanel ref="genPanelRef" @jobs-changed="onJobsChanged" />
+      </a-tab-pane>
       <a-tab-pane key="speech" tab="语音评测 (Uni)">
         <UniEvalPage ref="uniPanelRef" embedded @jobs-changed="onJobsChanged" />
       </a-tab-pane>
@@ -33,6 +36,7 @@ import PageTitle from '@/components/PageTitle.vue'
 import EvalRecentJobsCard, {
   type EvalRecentJobItem,
 } from '@/components/EvalRecentJobsCard.vue'
+import OralGenPanel from '@/pages/OralGenPanel.vue'
 import UniEvalPage from '@/pages/UniEvalPage.vue'
 import ContentEvalPage from '@/pages/ContentEvalPage.vue'
 import CombinedEvalPanel from '@/pages/CombinedEvalPanel.vue'
@@ -41,7 +45,10 @@ const route = useRoute()
 const router = useRouter()
 const loginUserStore = useLoginUserStore()
 
-const mainTab = ref<'speech' | 'content' | 'combined'>('speech')
+type OralTab = 'generate' | 'speech' | 'content' | 'combined'
+
+const mainTab = ref<OralTab>('generate')
+const genPanelRef = ref<InstanceType<typeof OralGenPanel> | null>(null)
 const uniPanelRef = ref<InstanceType<typeof UniEvalPage> | null>(null)
 const contentPanelRef = ref<InstanceType<typeof ContentEvalPage> | null>(null)
 const combinedPanelRef = ref<InstanceType<typeof CombinedEvalPanel> | null>(null)
@@ -49,15 +56,18 @@ const recentCardRef = ref<InstanceType<typeof EvalRecentJobsCard> | null>(null)
 
 function applyTabFromRoute() {
   const tab = route.query.tab
-  if (tab === 'content') mainTab.value = 'content'
+  if (tab === 'generate') mainTab.value = 'generate'
+  else if (tab === 'content') mainTab.value = 'content'
   else if (tab === 'combined') mainTab.value = 'combined'
   else if (tab === 'speech') mainTab.value = 'speech'
 }
 
 function tabQuery(tab: string) {
+  if (tab === 'generate') return { tab: 'generate' }
   if (tab === 'content') return { tab: 'content' }
   if (tab === 'combined') return { tab: 'combined' }
-  return {}
+  if (tab === 'speech') return { tab: 'speech' }
+  return { tab: 'generate' }
 }
 
 function onMainTabChange(key: string) {
@@ -77,8 +87,19 @@ async function viewRecentJob(item: EvalRecentJobItem) {
     await router.push({ path: '/listen-eval', query: { job: item.jobId } })
     return
   }
-  mainTab.value = item.kind
-  await router.replace({ path: '/oral-eval', query: tabQuery(item.kind) })
+  if (item.kind === 'oral_gen') {
+    mainTab.value = 'generate'
+    await router.replace({ path: '/oral-eval', query: { tab: 'generate', job: item.jobId } })
+    await nextTick()
+    try {
+      await genPanelRef.value?.loadJob(item.jobId)
+    } catch (e: unknown) {
+      message.error(e instanceof Error ? e.message : '加载任务失败')
+    }
+    return
+  }
+  mainTab.value = item.kind as 'speech' | 'content' | 'combined'
+  await router.replace({ path: '/oral-eval', query: { ...tabQuery(item.kind), job: item.jobId } })
   await nextTick()
   try {
     if (item.kind === 'speech') {
@@ -99,7 +120,9 @@ async function loadJobFromRoute() {
   applyTabFromRoute()
   await nextTick()
   try {
-    if (mainTab.value === 'speech') {
+    if (mainTab.value === 'generate') {
+      await genPanelRef.value?.loadJob(id)
+    } else if (mainTab.value === 'speech') {
       await uniPanelRef.value?.loadJob(id)
     } else if (mainTab.value === 'content') {
       await contentPanelRef.value?.loadJob(id)
@@ -123,10 +146,31 @@ watch(
   },
 )
 
+async function handleOralGenImportQuery() {
+  const og = route.query.oralGenJob
+  if (typeof og !== 'string' || !og) return
+  mainTab.value = 'combined'
+  await router.replace({ path: '/oral-eval', query: { tab: 'combined' } })
+  await nextTick()
+  try {
+    await combinedPanelRef.value?.importOralGenJob(og, true)
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : '导入失败')
+  }
+}
+
 onMounted(() => {
   applyTabFromRoute()
   void loadJobFromRoute()
+  void handleOralGenImportQuery()
 })
+
+watch(
+  () => route.query.oralGenJob,
+  () => {
+    void handleOralGenImportQuery()
+  },
+)
 </script>
 
 <style scoped>

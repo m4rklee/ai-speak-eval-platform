@@ -14,6 +14,8 @@ FRONTEND="$ROOT/frontend"
 PYTHON="${PYTHON:-/root/miniconda3/bin/python}"
 NPM="${NPM:-/root/miniconda3/bin/npm}"
 DAEMON_SCRIPT="$ROOT/scripts/eval-daemons.sh"
+# shellcheck source=ensure-infra.sh
+source "$ROOT/scripts/ensure-infra.sh"
 
 TARGET="${1:-default}"
 
@@ -52,7 +54,7 @@ ensure_deps() {
 }
 
 ensure_daemons() {
-  echo "=== 1/3 评测 daemon (MultiPA + APG-MOS) ==="
+  echo "=== 2/4 评测 daemon (MultiPA + APG-MOS) ==="
   bash "$DAEMON_SCRIPT" start --wait
 }
 
@@ -66,7 +68,7 @@ start_backend() {
   pkill -f "uvicorn app.main:app.*6008" 2>/dev/null || true
   sleep 1
   ensure_deps
-  echo "=== 启动后端 :6008 ==="
+  echo "=== 3/4 启动后端 :6008 ==="
   cd "$BACKEND"
   nohup "$PYTHON" -m uvicorn app.main:app --host 0.0.0.0 --port 6008 \
     >> /tmp/ai-eval-backend.log 2>&1 &
@@ -88,7 +90,7 @@ start_frontend() {
   pkill -f "vite.*6006" 2>/dev/null || true
   sleep 1
   ensure_deps
-  echo "=== 启动前端 :6006 ==="
+  echo "=== 4/4 启动前端 :6006 ==="
   cd "$FRONTEND"
   nohup "$NPM" run dev -- --host 0.0.0.0 --port 6006 \
     >> /tmp/ai-eval-frontend.log 2>&1 &
@@ -100,19 +102,28 @@ start_frontend() {
   port_open 6006 && echo "frontend :6006 -> up" || { echo "frontend 启动失败"; exit 1; }
 }
 
+# 任意启动网站相关进程前，先拉起数据库与 Redis
+bootstrap_infra() {
+  echo "=== 1/4 基础服务 (MariaDB + Redis) ==="
+  ensure_db_infra
+}
+
 case "$TARGET" in
   daemons)
     bash "$DAEMON_SCRIPT" "${2:-start}" "${3:-}"
     ;;
   frontend)
+    bootstrap_infra
     ensure_daemons
     start_frontend true
     ;;
   backend)
+    bootstrap_infra
     ensure_daemons
     start_backend true
     ;;
   all)
+    bootstrap_infra
     bash "$DAEMON_SCRIPT" stop 2>/dev/null || true
     stop_one backend /tmp/ai-eval-backend.pid 6008
     stop_one frontend /tmp/ai-eval-frontend.pid 6006
@@ -124,6 +135,7 @@ case "$TARGET" in
     start_frontend true
     ;;
   default|web|start|"")
+    bootstrap_infra
     ensure_daemons
     start_backend false
     start_frontend false
