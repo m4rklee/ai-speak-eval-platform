@@ -145,7 +145,4 @@ bash scripts/restart-dev.sh daemons    # 仅管理评测 daemon
 └── scripts/           # 启动与 daemon 脚本
 ```
 
-更完整的架构与 API 文档见 [`PROJECT.md`](PROJECT.md)。
-
----
-                                                  
+完整的架构与 API 文档见 [`PROJECT.md`](PROJECT.md)。                                              
