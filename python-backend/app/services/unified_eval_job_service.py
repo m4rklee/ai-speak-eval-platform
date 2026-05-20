@@ -12,6 +12,7 @@ import time
 import uuid
 import zipfile
 from datetime import datetime
+from statistics import mean
 from typing import Any, Optional
 
 from fastapi import UploadFile
@@ -19,13 +20,36 @@ from fastapi import UploadFile
 from app.core.config import get_settings
 from app.core.errors import BusinessException, ErrorCode
 from app.db.redis import get_redis
+from app.services.eval_job_meta import (
+    apply_create_meta,
+    meta_vo,
+    update_display_name as apply_display_name,
+)
+from app.services.eval_rounds import aggregate_speech_rows
+from app.services.job_progress import (
+    api_error_vo,
+    append_warning_to_detail,
+    record_row_error,
+)
+from app.services.job_control import (
+    assert_can_pause,
+    assert_can_rerun,
+    check_pause_requested,
+    control_meta_vo,
+    eval_job_input_dir,
+    prepare_rerun_payload,
+    request_pause,
+    save_input_snapshot,
+)
 from app.services.unified_eval_progress import JobProgressReporter, progress_detail_vo
+from app.services.job_resume import assert_can_resume, resume_meta_vo, wrap_task
 from app.services.oral_eval.unified_eval_runner import (
     map_to_pronunciation,
     run_directory_eval,
     score_single_wav,
     validate_unified_eval_paths,
 )
+from app.services.token_aggregate import token_summary_vo
 
 logger = logging.getLogger(__name__)
 
@@ -222,12 +246,64 @@ def _compute_model_comparison(model_results: list[dict[str, Any]]) -> dict[str, 
     return {"byModel": by_model}
 
 
+def _build_merged_result(
+    model_name: str,
+    input_dir: str,
+    per_file: list[dict[str, Any]],
+) -> dict[str, Any]:
+    per_file = sorted(per_file, key=lambda x: x.get("wavname", ""))
+    bvcc_scores = [
+        e["apg_mos"]["bvcc"]
+        for e in per_file
+        if isinstance(e.get("apg_mos", {}).get("bvcc"), (int, float))
+    ]
+    somos_scores = [
+        e["apg_mos"]["somos"]
+        for e in per_file
+        if isinstance(e.get("apg_mos", {}).get("somos"), (int, float))
+    ]
+    acc_vals, flu_vals, nat_vals = [], [], []
+    for e in per_file:
+        mp = e.get("multipa") or {}
+        if isinstance(mp.get("发音准确性"), (int, float)):
+            acc_vals.append(float(mp["发音准确性"]))
+        if isinstance(mp.get("流利度"), (int, float)):
+            flu_vals.append(float(mp["流利度"]))
+        if isinstance(mp.get("韵律"), (int, float)):
+            nat_vals.append(float(mp["韵律"]))
+    multipa_dims = {}
+    if acc_vals:
+        multipa_dims["发音准确性"] = round(mean(acc_vals), 4)
+    if flu_vals:
+        multipa_dims["流利度"] = round(mean(flu_vals), 4)
+    if nat_vals:
+        multipa_dims["韵律"] = round(mean(nat_vals), 4)
+    return {
+        "model": model_name,
+        "input_dir": os.path.abspath(input_dir),
+        "evaluated_at": datetime.now().isoformat(timespec="seconds"),
+        "engine": "daemon",
+        "summary": {
+            "multipa": multipa_dims,
+            "apg_mos_bvcc_mean": round(mean(bvcc_scores), 4) if bvcc_scores else None,
+            "apg_mos_somos_mean": round(mean(somos_scores), 4) if somos_scores else None,
+            "file_count": len(per_file),
+        },
+        "per_file": per_file,
+    }
+
+
 def _job_vo_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
     job_type = payload.get("job_type") or "single"
     result = payload.get("result") or {}
 
     if job_type == "multi_model":
-        models_raw = result.get("models") or payload.get("models") or []
+        models_raw = (
+            result.get("models")
+            or payload.get("models")
+            or payload.get("partial_model_results")
+            or []
+        )
         models_vo = []
         all_per_file: list[dict[str, Any]] = []
         for m in models_raw:
@@ -242,6 +318,8 @@ def _job_vo_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
                 }
             )
         comparison = result.get("comparison") or payload.get("comparison")
+        meta = resume_meta_vo(payload)
+        detail = append_warning_to_detail(payload.get("progress_detail"), payload)
         return {
             "jobId": payload.get("job_id", ""),
             "jobType": "multi_model",
@@ -257,19 +335,28 @@ def _job_vo_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
             "result": result if result else None,
             "createdAt": payload.get("created_at"),
             "finishedAt": payload.get("finished_at"),
-            "progressDetail": progress_detail_vo(payload.get("progress_detail")),
+            "progressDetail": progress_detail_vo(detail),
             "audioAvailable": bool(payload.get("audio_dir")),
+            **meta_vo(payload),
+            **api_error_vo(payload),
+            **token_summary_vo(payload),
+            **meta,
+            **control_meta_vo(payload, JOB_KEY_PREFIX, payload.get("job_id", "")),
         }
 
     summary_raw = result.get("summary")
     summary = _summary_vo(summary_raw)
-    if payload.get("per_file_rows"):
+    if payload.get("partial_per_file_rows"):
+        per_file = payload["partial_per_file_rows"]
+    elif payload.get("per_file_rows"):
         per_file = payload["per_file_rows"]
     elif result.get("per_file"):
         per_file = [_per_file_to_row(e) for e in result["per_file"]]
     else:
         per_file = None
 
+    meta = resume_meta_vo(payload)
+    detail = append_warning_to_detail(payload.get("progress_detail"), payload)
     return {
         "jobId": payload.get("job_id", ""),
         "jobType": "single",
@@ -285,8 +372,13 @@ def _job_vo_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "result": result if result else None,
         "createdAt": payload.get("created_at"),
         "finishedAt": payload.get("finished_at"),
-        "progressDetail": progress_detail_vo(payload.get("progress_detail")),
+        "progressDetail": progress_detail_vo(detail),
         "audioAvailable": bool(payload.get("audio_dir")),
+        **meta_vo(payload),
+        **api_error_vo(payload),
+        **token_summary_vo(payload),
+        **meta,
+        **control_meta_vo(payload, JOB_KEY_PREFIX, payload.get("job_id", "")),
     }
 
 
@@ -402,6 +494,9 @@ class UnifiedEvalJobService:
         user_id: int,
         files: list[UploadFile],
         archive: Optional[UploadFile] = None,
+        *,
+        display_name: Optional[str] = None,
+        eval_rounds: Optional[int] = None,
     ) -> str:
         ok, reason = validate_unified_eval_paths()
         if not ok:
@@ -410,8 +505,10 @@ class UnifiedEvalJobService:
         if not files and not archive:
             raise BusinessException(ErrorCode.PARAMS_ERROR, "请上传 wav 文件或 zip 压缩包")
 
-        tmpdir = tempfile.mkdtemp(prefix="uni_eval_job_")
+        job_id = uuid.uuid4().hex
+        tmpdir = eval_job_input_dir(job_id)
         try:
+            os.makedirs(tmpdir, exist_ok=True)
             written = await UnifiedEvalJobService._materialize_wavs(tmpdir, files, archive)
             if not written:
                 raise BusinessException(ErrorCode.PARAMS_ERROR, "未找到有效的 .wav 文件")
@@ -421,7 +518,6 @@ class UnifiedEvalJobService:
                     f"单任务最多 {MAX_FILES_PER_JOB} 个 wav 文件",
                 )
 
-            job_id = uuid.uuid4().hex
             now = datetime.now().isoformat(timespec="seconds")
             payload = {
                 "job_id": job_id,
@@ -431,71 +527,223 @@ class UnifiedEvalJobService:
                 "progress": 0,
                 "total_files": len(written),
                 "work_dir": tmpdir,
+                "file_names": written,
+                "partial_per_file_entries": [],
+                "partial_per_file_rows": [],
+                "completed_count": 0,
                 "created_at": now,
                 "finished_at": None,
                 "error": None,
                 "result": None,
+                "api_error_count": 0,
             }
+            apply_create_meta(
+                payload,
+                job_type="speech",
+                display_name=display_name,
+                eval_rounds=eval_rounds,
+            )
+            save_input_snapshot(
+                payload,
+                work_dir=tmpdir,
+                file_names=written,
+                job_type="single",
+                total_files=len(written),
+                eval_rounds=payload.get("eval_rounds"),
+                display_name=payload.get("display_name"),
+            )
             await _save_job(job_id, payload)
             await _push_user_job(user_id, job_id)
 
-            import asyncio
-
-            asyncio.create_task(
-                UnifiedEvalJobService._run_job(job_id, tmpdir, len(written))
-            )
+            wrap_task(JOB_KEY_PREFIX, job_id, UnifiedEvalJobService._run_job(job_id))
             return job_id
         except Exception:
-            shutil.rmtree(tmpdir, ignore_errors=True)
+            if os.path.isdir(tmpdir):
+                shutil.rmtree(tmpdir, ignore_errors=True)
             raise
 
     @staticmethod
-    async def _run_job(job_id: str, work_dir: str, total_files: int) -> None:
+    async def resume_job(user_id: int, job_id: str) -> None:
         payload = await _load_job(job_id)
         if not payload:
-            shutil.rmtree(work_dir, ignore_errors=True)
+            raise BusinessException(ErrorCode.NOT_FOUND_ERROR, "任务不存在")
+        if payload.get("user_id") != user_id:
+            raise BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限")
+        assert_can_resume(payload, job_id, JOB_KEY_PREFIX)
+        work_dir = payload.get("work_dir")
+        if not work_dir or not os.path.isdir(work_dir):
+            raise BusinessException(ErrorCode.OPERATION_ERROR, "工作目录不可用，无法续跑")
+        payload["status"] = "running"
+        payload["error"] = None
+        await _save_job(job_id, payload)
+        if payload.get("job_type") == "multi_model":
+            wrap_task(
+                JOB_KEY_PREFIX,
+                job_id,
+                UnifiedEvalJobService._run_multi_model_job(job_id),
+            )
+        else:
+            wrap_task(JOB_KEY_PREFIX, job_id, UnifiedEvalJobService._run_job(job_id))
+
+    @staticmethod
+    async def pause_job(user_id: int, job_id: str) -> None:
+        payload = await _load_job(job_id)
+        if not payload:
+            raise BusinessException(ErrorCode.NOT_FOUND_ERROR, "任务不存在")
+        if payload.get("user_id") != user_id:
+            raise BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限")
+        assert_can_pause(payload, job_id, JOB_KEY_PREFIX)
+        request_pause(payload)
+        await _save_job(job_id, payload)
+
+    @staticmethod
+    async def rerun_job(user_id: int, job_id: str) -> None:
+        payload = await _load_job(job_id)
+        if not payload:
+            raise BusinessException(ErrorCode.NOT_FOUND_ERROR, "任务不存在")
+        if payload.get("user_id") != user_id:
+            raise BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限")
+        assert_can_rerun(payload, job_id, JOB_KEY_PREFIX)
+        prepare_rerun_payload(payload)
+        await _save_job(job_id, payload)
+        if payload.get("job_type") == "multi_model":
+            wrap_task(
+                JOB_KEY_PREFIX,
+                job_id,
+                UnifiedEvalJobService._run_multi_model_job(job_id),
+            )
+        else:
+            wrap_task(JOB_KEY_PREFIX, job_id, UnifiedEvalJobService._run_job(job_id))
+
+    @staticmethod
+    async def _eval_one_wav(
+        work_dir: str,
+        wav_name: str,
+        model_name: str,
+        job_id: str,
+        reporter: Optional[JobProgressReporter] = None,
+        *,
+        eval_rounds: int = 1,
+    ) -> dict[str, Any]:
+        wav_path = os.path.join(work_dir, wav_name)
+        if not os.path.isfile(wav_path):
+            raise RuntimeError(f"音频文件不存在: {wav_name}")
+        with tempfile.TemporaryDirectory(prefix="uni_eval_one_") as tmpdir:
+            shutil.copy2(
+                wav_path,
+                os.path.join(tmpdir, wav_name),
+            )
+            round_entries: list[dict[str, Any]] = []
+            for rnd in range(max(1, eval_rounds)):
+                merged = await run_directory_eval(
+                    tmpdir,
+                    model_name,
+                    job_id=job_id,
+                    reporter=reporter if rnd == 0 else None,
+                )
+                entries = merged.get("per_file") or []
+                if not entries:
+                    raise RuntimeError(f"无评测结果: {wav_name}")
+                round_entries.append(entries[0])
+            if len(round_entries) > 1:
+                return aggregate_speech_rows(round_entries)
+            return round_entries[0]
+
+    @staticmethod
+    async def _run_job(job_id: str) -> None:
+        payload = await _load_job(job_id)
+        if not payload:
+            return
+
+        work_dir = payload.get("work_dir")
+        file_names: list[str] = payload.get("file_names") or []
+        total_files = len(file_names)
+        if not work_dir or not file_names:
+            payload["status"] = "failed"
+            payload["error"] = "任务输入数据已丢失"
+            await _save_job(job_id, payload)
             return
 
         job_t0 = time.perf_counter()
-        reporter = JobProgressReporter(job_id, total_files)
+        eval_rounds = int(payload.get("eval_rounds") or 1)
+        entries: list[dict[str, Any]] = list(payload.get("partial_per_file_entries") or [])
+        rows: list[dict[str, Any]] = list(payload.get("partial_per_file_rows") or [])
+        start_idx = len(entries)
+        total_units = max(1, total_files * eval_rounds)
+        model_name = f"uni_{job_id}"
+        reporter = JobProgressReporter(job_id, total_units)
         await reporter.start()
         status = "failed"
         engine: Optional[str] = None
         error: Optional[str] = None
 
         try:
-            merged = await run_directory_eval(
-                work_dir,
-                f"uni_{job_id}",
-                job_id=job_id,
-                reporter=reporter,
-            )
+            for idx in range(start_idx, total_files):
+                wav_name = file_names[idx]
+                reporter._files_base_offset = idx * eval_rounds
+                reporter._segment_files = eval_rounds
+                await reporter.set_parallel_eval(total=eval_rounds)
+                await reporter.tick_file(idx * eval_rounds, message=wav_name)
+                entry = await UnifiedEvalJobService._eval_one_wav(
+                    work_dir,
+                    wav_name,
+                    model_name,
+                    job_id,
+                    reporter=reporter,
+                    eval_rounds=eval_rounds,
+                )
+                entries.append(entry)
+                row = _per_file_to_row(entry)
+                record_row_error(payload, row)
+                rows.append(row)
+                payload = await _load_job(job_id) or payload
+                payload["partial_per_file_entries"] = entries
+                payload["partial_per_file_rows"] = rows
+                payload["completed_count"] = len(entries)
+                await _save_job(job_id, payload)
+                reporter._live_multipa_done = True
+                reporter._live_apg_done = True
+                reporter._live_multipa_current = eval_rounds
+                reporter._live_apg_current = eval_rounds * 2
+                await reporter.tick_file((idx + 1) * eval_rounds, message=wav_name)
+                if await check_pause_requested(_load_job, job_id, payload):
+                    return
+
+            merged = _build_merged_result(model_name, work_dir, entries)
             engine = merged.get("engine")
-            per_file_rows = [_per_file_to_row(e) for e in merged.get("per_file", [])]
             await reporter.finish(success=True)
             payload = await _load_job(job_id) or payload
             payload["status"] = "completed"
             payload["progress"] = 100
             payload["result"] = merged
-            payload["per_file_rows"] = per_file_rows
+            payload["per_file_rows"] = rows
             payload["finished_at"] = datetime.now().isoformat(timespec="seconds")
+            payload.pop("partial_per_file_entries", None)
+            payload.pop("partial_per_file_rows", None)
+            payload.pop("completed_count", None)
+            payload.pop("file_names", None)
             status = "completed"
         except Exception as e:
             logger.exception("Uni eval job %s failed", job_id)
             await reporter.finish(success=False)
             payload = await _load_job(job_id) or payload
             payload["status"] = "failed"
-            payload["progress"] = 100
+            payload["progress"] = int(min(99, (len(entries) / max(1, total_files)) * 100))
             payload["error"] = str(e)[:500]
+            payload["partial_per_file_entries"] = entries
+            payload["partial_per_file_rows"] = rows
+            payload["completed_count"] = len(entries)
             payload["finished_at"] = datetime.now().isoformat(timespec="seconds")
             error = str(e)[:500]
         finally:
             await reporter.stop()
-            audio_dir = _archive_job_audio(work_dir, job_id)
-            if audio_dir:
-                payload["audio_dir"] = audio_dir
-            shutil.rmtree(work_dir, ignore_errors=True)
-            payload.pop("work_dir", None)
+            if payload.get("status") in ("completed", "failed"):
+                audio_dir = _archive_job_audio(work_dir, job_id)
+                if audio_dir:
+                    payload["audio_dir"] = audio_dir
+                    snapshot = payload.get("input_snapshot") or {}
+                    snapshot["audio_dir"] = audio_dir
+                    payload["input_snapshot"] = snapshot
             await _save_job(job_id, payload)
             _log_uni_eval_timing(
                 event="job_finished",
@@ -509,7 +757,13 @@ class UnifiedEvalJobService:
             )
 
     @staticmethod
-    async def create_multi_model_job(user_id: int, form: Any) -> str:
+    async def create_multi_model_job(
+        user_id: int,
+        form: Any,
+        *,
+        display_name: Optional[str] = None,
+        eval_rounds: Optional[int] = None,
+    ) -> str:
         ok, reason = validate_unified_eval_paths()
         if not ok:
             raise BusinessException(ErrorCode.OPERATION_ERROR, reason)
@@ -530,11 +784,13 @@ class UnifiedEvalJobService:
             seen.add(key)
             unique_names.append(name)
 
-        tmpdir = tempfile.mkdtemp(prefix="uni_eval_multi_")
+        job_id = uuid.uuid4().hex
+        tmpdir = eval_job_input_dir(job_id)
         model_specs: list[dict[str, Any]] = []
         total_files = 0
 
         try:
+            os.makedirs(tmpdir, exist_ok=True)
             for idx, model_name in enumerate(unique_names):
                 dir_name = _safe_model_dir_name(model_name)
                 dest_dir = os.path.join(tmpdir, dir_name)
@@ -566,10 +822,10 @@ class UnifiedEvalJobService:
                         "modelName": model_name,
                         "dirName": dir_name,
                         "fileCount": len(written),
+                        "fileNames": written,
                     }
                 )
 
-            job_id = uuid.uuid4().hex
             now = datetime.now().isoformat(timespec="seconds")
             payload = {
                 "job_id": job_id,
@@ -581,79 +837,128 @@ class UnifiedEvalJobService:
                 "progress": 0,
                 "total_files": total_files,
                 "work_dir": tmpdir,
+                "model_cursor": 0,
+                "partial_model_results": [],
+                "completed_count": 0,
                 "created_at": now,
                 "finished_at": None,
                 "error": None,
                 "result": None,
+                "api_error_count": 0,
             }
+            apply_create_meta(
+                payload,
+                job_type="speech",
+                display_name=display_name,
+                eval_rounds=eval_rounds,
+            )
+            save_input_snapshot(
+                payload,
+                work_dir=tmpdir,
+                model_specs=model_specs,
+                models=unique_names,
+                job_type="multi_model",
+                total_files=total_files,
+                eval_rounds=payload.get("eval_rounds"),
+                display_name=payload.get("display_name"),
+            )
             await _save_job(job_id, payload)
             await _push_user_job(user_id, job_id)
 
-            import asyncio
-
-            asyncio.create_task(
-                UnifiedEvalJobService._run_multi_model_job(job_id, tmpdir, model_specs, total_files)
+            wrap_task(
+                JOB_KEY_PREFIX,
+                job_id,
+                UnifiedEvalJobService._run_multi_model_job(job_id),
             )
             return job_id
         except Exception:
-            shutil.rmtree(tmpdir, ignore_errors=True)
+            if os.path.isdir(tmpdir):
+                shutil.rmtree(tmpdir, ignore_errors=True)
             raise
 
     @staticmethod
-    async def _run_multi_model_job(
-        job_id: str,
-        work_dir: str,
-        model_specs: list[dict[str, Any]],
-        total_files: int,
-    ) -> None:
+    async def _run_multi_model_job(job_id: str) -> None:
         payload = await _load_job(job_id)
         if not payload:
-            shutil.rmtree(work_dir, ignore_errors=True)
             return
 
-        reporter = JobProgressReporter(job_id, max(1, total_files))
+        work_dir = payload.get("work_dir")
+        model_specs: list[dict[str, Any]] = payload.get("model_specs") or []
+        total_files = int(payload.get("total_files") or 0)
+        if not work_dir or not model_specs:
+            payload["status"] = "failed"
+            payload["error"] = "任务输入数据已丢失"
+            await _save_job(job_id, payload)
+            return
+
+        eval_rounds = int(payload.get("eval_rounds") or 1)
+        total_units = max(1, total_files * eval_rounds)
+        reporter = JobProgressReporter(job_id, total_units)
         await reporter.start()
 
-        model_results: list[dict[str, Any]] = []
-        files_done = 0
+        model_results: list[dict[str, Any]] = list(payload.get("partial_model_results") or [])
+        model_cursor = int(payload.get("model_cursor") or 0)
+        files_done = sum(len(m.get("perFile") or []) for m in model_results)
         job_t0 = time.perf_counter()
         status = "failed"
         error: Optional[str] = None
 
         try:
-            for idx, spec in enumerate(model_specs):
+            for idx in range(model_cursor, len(model_specs)):
+                spec = model_specs[idx]
                 model_name = spec["modelName"]
                 dir_name = spec["dirName"]
                 subdir = os.path.join(work_dir, dir_name)
-                n_files = spec["fileCount"]
+                file_names = spec.get("fileNames") or sorted(
+                    f
+                    for f in os.listdir(subdir)
+                    if f.lower().endswith(".wav") and os.path.isfile(os.path.join(subdir, f))
+                )
+                n_files = len(file_names)
 
-                await reporter.begin_segment(n_files, files_done)
+                await reporter.begin_segment(n_files * eval_rounds, files_done * eval_rounds)
                 await reporter.set_phase(
                     "parallel",
                     message=f"{model_name} · {idx + 1}/{len(model_specs)}",
                 )
 
-                merged = await run_directory_eval(
-                    subdir,
-                    model_name,
-                    job_id=job_id,
-                    reporter=reporter,
-                )
-                per_file_rows = [_per_file_to_row(e) for e in merged.get("per_file", [])]
-                summary_raw = merged.get("summary") or {}
+                entries: list[dict[str, Any]] = []
+                for file_idx, wav_name in enumerate(file_names):
+                    global_idx = files_done + file_idx
+                    reporter._files_base_offset = global_idx * eval_rounds
+                    reporter._segment_files = n_files * eval_rounds
+                    entry = await UnifiedEvalJobService._eval_one_wav(
+                        subdir,
+                        wav_name,
+                        model_name,
+                        job_id,
+                        reporter=reporter,
+                        eval_rounds=eval_rounds,
+                    )
+                    entries.append(entry)
+                    await reporter.tick_file(
+                        (global_idx + 1) * eval_rounds,
+                        message=f"已完成 {model_name} ({global_idx + 1}/{total_files})",
+                    )
+
+                merged = _build_merged_result(model_name, subdir, entries)
+                per_file_rows = [_per_file_to_row(e) for e in entries]
                 model_results.append(
                     {
                         "modelName": model_name,
-                        "summary": summary_raw,
+                        "summary": merged.get("summary") or {},
                         "perFile": per_file_rows,
                     }
                 )
                 files_done += n_files
-                await reporter.tick_file(
-                    files_done,
-                    message=f"已完成 {model_name} ({files_done}/{total_files})",
-                )
+                payload = await _load_job(job_id) or payload
+                payload["partial_model_results"] = model_results
+                payload["model_cursor"] = idx + 1
+                payload["completed_count"] = files_done
+                await _save_job(job_id, payload)
                 await reporter.sync_live_from_redis()
+                if await check_pause_requested(_load_job, job_id, payload):
+                    return
 
             comparison = _compute_model_comparison(model_results)
             await reporter.finish(success=True)
@@ -667,24 +972,31 @@ class UnifiedEvalJobService:
             payload["models"] = model_results
             payload["comparison"] = comparison
             payload["finished_at"] = datetime.now().isoformat(timespec="seconds")
+            payload.pop("partial_model_results", None)
+            payload.pop("model_cursor", None)
+            payload.pop("completed_count", None)
             status = "completed"
         except Exception as e:
             logger.exception("Uni multi-model job %s failed", job_id)
             await reporter.finish(success=False)
             payload = await _load_job(job_id) or payload
             payload["status"] = "failed"
-            payload["progress"] = 100
+            payload["progress"] = int(min(99, (files_done / max(1, total_files)) * 100))
             payload["error"] = str(e)[:500]
+            payload["partial_model_results"] = model_results
+            payload["model_cursor"] = len(model_results)
+            payload["completed_count"] = files_done
             payload["finished_at"] = datetime.now().isoformat(timespec="seconds")
             error = str(e)[:500]
         finally:
             await reporter.stop()
-            audio_dir = _archive_job_audio(work_dir, job_id, multi_model=True)
-            if audio_dir:
-                payload["audio_dir"] = audio_dir
-            shutil.rmtree(work_dir, ignore_errors=True)
-            payload.pop("work_dir", None)
-            payload.pop("model_specs", None)
+            if payload.get("status") in ("completed", "failed"):
+                audio_dir = _archive_job_audio(work_dir, job_id, multi_model=True)
+                if audio_dir:
+                    payload["audio_dir"] = audio_dir
+                    snapshot = payload.get("input_snapshot") or {}
+                    snapshot["audio_dir"] = audio_dir
+                    payload["input_snapshot"] = snapshot
             await _save_job(job_id, payload)
             _log_uni_eval_timing(
                 event="job_finished",
@@ -742,6 +1054,16 @@ class UnifiedEvalJobService:
         if not os.path.isfile(path):
             raise BusinessException(ErrorCode.NOT_FOUND_ERROR, f"音频不存在: {safe}")
         return path
+
+    @staticmethod
+    async def update_display_name(user_id: int, job_id: str, display_name: str) -> None:
+        payload = await _load_job(job_id)
+        if not payload:
+            raise BusinessException(ErrorCode.NOT_FOUND_ERROR, "任务不存在")
+        if payload.get("user_id") != user_id:
+            raise BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限")
+        await apply_display_name(payload, display_name)
+        await _save_job(job_id, payload)
 
     @staticmethod
     async def list_jobs(user_id: int) -> list[dict[str, Any]]:

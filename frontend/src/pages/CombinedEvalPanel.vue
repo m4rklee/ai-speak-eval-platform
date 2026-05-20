@@ -34,6 +34,24 @@
     </a-card>
 
     <a-card class="section">
+      <a-form layout="inline" class="batch-meta-form">
+        <a-form-item label="任务名称（可选）">
+          <a-input v-model:value="displayName" placeholder="留空则自动生成" :maxlength="64" style="width: 200px" />
+        </a-form-item>
+        <a-form-item label="评测轮次">
+          <a-input-number v-model:value="evalRounds" :min="1" :max="5" style="width: 80px" />
+        </a-form-item>
+        <a-form-item label="Judge 模型">
+          <a-select
+            v-model:value="judgeModel"
+            show-search
+            placeholder="选择文本模型"
+            :loading="judgeModelsLoading"
+            :options="judgeModelOptions"
+            style="width: 280px"
+          />
+        </a-form-item>
+      </a-form>
       <a-tabs v-model:activeKey="batchMode" size="small">
         <a-tab-pane key="pipeline" tab="一站式（生成+评测）">
           <a-form layout="vertical" class="pipeline-form">
@@ -227,6 +245,33 @@
     </a-card>
 
     <a-card v-if="jobId" id="combined-job-detail" title="任务进度" class="section" size="small">
+      <template #extra>
+        <JobProgressActions
+          v-if="jobStatus"
+          :job="jobStatus"
+          :pause-loading="pauseLoading"
+          :resume-loading="resumeLoading"
+          :rerun-loading="rerunLoading"
+          @pause="handlePause"
+          @resume="handleResume"
+          @rerun="handleRerun"
+        />
+      </template>
+      <JobInterruptedBanner
+        v-if="jobStatus"
+        :job="jobStatus"
+        :loading="resumeLoading"
+        :resume-label="jobStatus.status === 'awaiting_eval' ? '开始综合评测' : '续跑'"
+        @resume="handleResume"
+      />
+      <JobApiErrorAlert :job="jobStatus" />
+      <JobDisplayNameEdit
+        v-if="jobStatus"
+        :job-id="jobId"
+        :display-name="jobStatus.displayName"
+        :on-save="saveJobDisplayName"
+        @saved="onDisplayNameSaved"
+      />
       <a-space direction="vertical" style="width: 100%">
         <a-space>
           <span class="job-id-text">{{ jobId }}</span>
@@ -234,6 +279,7 @@
             {{ statusLabel(jobStatus?.status || '') }}
           </a-tag>
           <span v-if="jobStatus">{{ jobStatus.progress }}%</span>
+          <span v-if="jobStatus?.judgeModel" class="hint">Judge: {{ jobStatus.judgeModel }}</span>
         </a-space>
         <UniEvalTqdmBar
           v-if="jobStatus"
@@ -241,15 +287,8 @@
           :detail="jobStatus.progressDetail"
           :job-status="jobStatus.status"
         />
+        <JobTokenSummary :job="jobStatus" />
         <a-alert v-if="jobStatus?.error" type="error" :message="jobStatus.error" show-icon />
-        <a-button
-          v-if="jobStatus?.status === 'awaiting_eval'"
-          type="primary"
-          :loading="continueLoading"
-          @click="continueEval"
-        >
-          开始综合评测（{{ evaluableGenCount }} 条）
-        </a-button>
       </a-space>
     </a-card>
 
@@ -302,6 +341,7 @@
           <a-button size="small" @click="exportCsv">导出 CSV</a-button>
         </a-space>
       </template>
+      <JobTokenSummary :job="jobStatus" />
       <a-descriptions v-if="jobStatus?.summary" size="small" :column="4" bordered class="summary-desc">
         <a-descriptions-item label="成对样本">{{ jobStatus.summary.pairCount }}</a-descriptions-item>
         <a-descriptions-item label="完全成功">{{ jobStatus.summary.okCount }}</a-descriptions-item>
@@ -356,7 +396,6 @@ import {
 import { useLoginUserStore } from '@/stores/loginUser'
 import { getContentEvalHealth } from '@/api/contentEvalController'
 import {
-  continueOralCombinedJob,
   createOralCombinedFromOralGen,
   createOralCombinedJob,
   createOralCombinedPipelineJob,
@@ -364,6 +403,10 @@ import {
   getOralCombinedAudioUrl,
   getOralCombinedHealth,
   getOralCombinedJob,
+  pauseOralCombinedJob,
+  rerunOralCombinedJob,
+  resumeOralCombinedJob,
+  updateOralCombinedJobDisplayName,
   type OralCombinedGenRow,
   type OralCombinedHealth,
   type OralCombinedJob,
@@ -371,8 +414,17 @@ import {
 } from '@/api/oralCombinedEvalController'
 import { getOralGenHealth } from '@/api/oralGenController'
 import { getUnifiedEvalHealth } from '@/api/unifiedEvalController'
+import { listModels, type ModelVO } from '@/api/modelController'
 import { useAudioIoModels } from '@/composables/useAudioIoModels'
 import UniEvalTqdmBar from '@/components/UniEvalTqdmBar.vue'
+import JobInterruptedBanner from '@/components/eval/JobInterruptedBanner.vue'
+import JobApiErrorAlert from '@/components/eval/JobApiErrorAlert.vue'
+import JobTokenSummary from '@/components/eval/JobTokenSummary.vue'
+import JobDisplayNameEdit from '@/components/eval/JobDisplayNameEdit.vue'
+import JobProgressActions from '@/components/eval/JobProgressActions.vue'
+import { useEvalJobPoll } from '@/composables/useEvalJobPoll'
+import { useEvalJobControls } from '@/composables/useEvalJobControls'
+import { modelSelectLabel } from '@/utils/modelPlatform'
 
 const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 const emit = defineEmits<{ (e: 'jobs-changed'): void }>()
@@ -407,7 +459,6 @@ const pipelineRequestInterval = ref(1)
 const pipelineAutoStart = ref(true)
 const pipelineUploadFiles = ref<File[]>([])
 const pipelineUploadFileList = ref<UploadProps['fileList']>([])
-const continueLoading = ref(false)
 const multiWavFiles = ref<File[]>([])
 const multiTxtFiles = ref<File[]>([])
 const multiWavFileList = ref<UploadProps['fileList']>([])
@@ -418,7 +469,27 @@ const dirInputRef = ref<HTMLInputElement | null>(null)
 const jobLoading = ref(false)
 const jobId = ref('')
 const jobStatus = ref<OralCombinedJob | null>(null)
+const displayName = ref('')
+const evalRounds = ref(1)
+const judgeModel = ref<string>()
+const judgeModels = ref<ModelVO[]>([])
+const judgeModelsLoading = ref(false)
 let pollTimer: ReturnType<typeof setInterval> | null = null
+
+const createMeta = computed(() => ({
+  displayName: displayName.value.trim() || undefined,
+  evalRounds: evalRounds.value,
+  judgeModel: judgeModel.value || undefined,
+}))
+
+const judgeModelOptions = computed(() =>
+  judgeModels.value.map((m) => ({ value: m.id, label: modelSelectLabel(m) })),
+)
+
+const { handlePollTerminal, handlePollCatch } = useEvalJobPoll({
+  completedMessage: '综合评测完成',
+  onRefreshRecent: () => emit('jobs-changed'),
+})
 let audioEl: HTMLAudioElement | null = null
 
 type PairRow = {
@@ -563,7 +634,9 @@ function formatScore(v?: number | null) {
 function statusColor(status: string) {
   if (status === 'completed') return 'green'
   if (status === 'failed') return 'red'
-  if (status === 'running') return 'processing'
+  if (status === 'running' || status === 'generating') return 'processing'
+  if (status === 'interrupted') return 'warning'
+  if (status === 'paused') return 'cyan'
   return 'default'
 }
 
@@ -575,6 +648,8 @@ function statusLabel(status: string) {
     pending: '排队',
     generating: '生成中',
     awaiting_eval: '待确认评测',
+    interrupted: '已中断',
+    paused: '已暂停',
   }
   return map[status] || status
 }
@@ -636,6 +711,9 @@ async function loadHealth() {
         oralGenMessage: og.message,
       }
     }
+    if (health.value?.judgeModel && !judgeModel.value) {
+      judgeModel.value = health.value.judgeModel
+    }
     systemPrompt.value = og.systemPrompt || ''
   } catch {
     /* optional */
@@ -661,6 +739,16 @@ function onPipelineUploadRemove(file: { name?: string }) {
     name: f.name,
     status: 'done',
   }))
+}
+
+async function loadJudgeModels() {
+  judgeModelsLoading.value = true
+  try {
+    const res = await listModels({ inputModality: 'text' })
+    if (res.data.code === 0) judgeModels.value = res.data.data || []
+  } finally {
+    judgeModelsLoading.value = false
+  }
 }
 
 async function runPipeline() {
@@ -689,6 +777,7 @@ async function runPipeline() {
         pipelineUploadFiles.value,
         pipelineAutoStart.value,
         pipelineRequestInterval.value,
+        createMeta.value,
       )
     } else {
       id = await createOralCombinedPipelineJob({
@@ -699,6 +788,7 @@ async function runPipeline() {
         seed: pipelineSeed.value,
         requestInterval: pipelineRequestInterval.value,
         autoStartEval: pipelineAutoStart.value,
+        ...createMeta.value,
       })
     }
     jobId.value = id
@@ -712,19 +802,39 @@ async function runPipeline() {
   }
 }
 
-async function continueEval() {
-  if (!jobId.value || !requireLogin()) return
-  continueLoading.value = true
-  try {
-    await continueOralCombinedJob(jobId.value)
-    message.success('已开始综合评测')
-    startPolling(jobId.value)
-    emit('jobs-changed')
-  } catch (e: unknown) {
-    message.error(e instanceof Error ? e.message : '启动失败')
-  } finally {
-    continueLoading.value = false
+async function saveJobDisplayName(name: string) {
+  if (!jobId.value) return
+  await updateOralCombinedJobDisplayName(jobId.value, name)
+  if (jobStatus.value) {
+    jobStatus.value = { ...jobStatus.value, displayName: name }
   }
+}
+
+function onDisplayNameSaved() {
+  emit('jobs-changed')
+}
+
+const {
+  pauseLoading,
+  rerunLoading,
+  resumeLoading,
+  handlePause,
+  handleRerun,
+  handleResume,
+} = useEvalJobControls({
+  jobId,
+  resumeJob: resumeOralCombinedJob,
+  pauseJob: pauseOralCombinedJob,
+  rerunJob: rerunOralCombinedJob,
+  startPolling,
+  pollJob,
+  onRefreshRecent: () => emit('jobs-changed'),
+  getResumeMessage: () =>
+    jobStatus.value?.status === 'awaiting_eval' ? '已开始综合评测' : '已开始续跑',
+})
+
+async function continueEval() {
+  await handleResume()
 }
 
 async function importOralGenJob(oralGenJobId: string, autoStartEval = true) {
@@ -846,7 +956,7 @@ async function runBatch() {
   jobLoading.value = true
   jobStatus.value = null
   try {
-    const id = await createOralCombinedJob(files, archive ?? undefined)
+    const id = await createOralCombinedJob(files, archive ?? undefined, createMeta.value)
     jobId.value = id
     message.success('综合评测任务已创建')
     startPolling(id)
@@ -875,17 +985,16 @@ async function pollJob(id: string) {
   try {
     const job = await getOralCombinedJob(id)
     jobStatus.value = job
-    if (job.status === 'awaiting_eval') {
+    if (job.status === 'awaiting_eval' || job.status === 'interrupted' || job.status === 'paused') {
       stopPolling()
       emit('jobs-changed')
     } else if (job.status === 'completed' || job.status === 'failed') {
       stopPolling()
-      emit('jobs-changed')
-      if (job.status === 'completed') message.success('综合评测完成')
-      else message.error(job.error || '任务失败')
+      handlePollTerminal(job)
     }
-  } catch {
+  } catch (e: unknown) {
     stopPolling()
+    handlePollCatch(e)
   }
 }
 
@@ -994,6 +1103,7 @@ defineExpose({ loadJob, importOralGenJob })
 
 onMounted(() => {
   void loadHealth()
+  void loadJudgeModels()
 })
 
 onUnmounted(() => {

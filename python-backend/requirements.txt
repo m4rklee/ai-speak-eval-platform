@@ -21,3 +21,7 @@ redis>=5.0.8,<7.0.0
 # OpenRouter
 openai>=2.36.0,<3.0.0
 httpx>=0.28.1,<1.0.0
+
+# 听力评测：非标准 wav（mp3/flac 伪装）转码
+soundfile>=0.12.1,<1.0.0
+numpy>=1.26.0,<3.0.0

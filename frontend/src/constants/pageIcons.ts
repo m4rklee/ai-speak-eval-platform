@@ -7,11 +7,13 @@ import {
   ExperimentOutlined,
   AppstoreOutlined,
   TeamOutlined,
+  BarChartOutlined,
 } from '@ant-design/icons-vue'
 
 export type PageIconKey =
   | 'oral-eval'
   | 'listen-eval'
+  | 'eval-reports'
   | 'models'
   | 'side-by-side'
   | 'prompt-lab'
@@ -31,6 +33,11 @@ export const PAGE_ICON_META: Record<
     icon: CustomerServiceOutlined,
     color: '#722ed1',
     bg: 'linear-gradient(135deg, #f9f0ff 0%, #efdbff 100%)',
+  },
+  'eval-reports': {
+    icon: BarChartOutlined,
+    color: '#13c2c2',
+    bg: 'linear-gradient(135deg, #e6fffb 0%, #b5f5ec 100%)',
   },
   models: {
     icon: DatabaseOutlined,

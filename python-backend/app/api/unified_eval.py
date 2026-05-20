@@ -2,13 +2,14 @@
 import os
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.db.session import get_async_db
 from app.schemas.common import BaseResponse
+from app.schemas.eval_job_common import EvalJobDisplayNameUpdateVO
 from app.schemas.unified_eval import (
     UnifiedEvalHealthVO,
     UnifiedEvalJobListVO,
@@ -77,9 +78,17 @@ async def create_job(
     db: AsyncSession = Depends(get_async_db),
     files: list[UploadFile] = File(default=[]),
     archive: Optional[UploadFile] = File(default=None),
+    display_name: Optional[str] = Form(default=None, alias="displayName"),
+    eval_rounds: Optional[int] = Form(default=None, alias="evalRounds"),
 ):
     user = await UserService.get_login_user(db, request)
-    job_id = await UnifiedEvalJobService.create_job(user.id, files, archive)
+    job_id = await UnifiedEvalJobService.create_job(
+        user.id,
+        files,
+        archive,
+        display_name=display_name,
+        eval_rounds=eval_rounds,
+    )
     return BaseResponse(code=0, data=job_id, message="ok")
 
 
@@ -90,7 +99,15 @@ async def create_multi_model_job(
 ):
     user = await UserService.get_login_user(db, request)
     form = await request.form()
-    job_id = await UnifiedEvalJobService.create_multi_model_job(user.id, form)
+    display_name = form.get("displayName")
+    eval_rounds_raw = form.get("evalRounds")
+    eval_rounds = int(eval_rounds_raw) if eval_rounds_raw not in (None, "") else None
+    job_id = await UnifiedEvalJobService.create_multi_model_job(
+        user.id,
+        form,
+        display_name=str(display_name).strip() if display_name else None,
+        eval_rounds=eval_rounds,
+    )
     return BaseResponse(code=0, data=job_id, message="ok")
 
 
@@ -113,6 +130,67 @@ async def list_jobs(
         data=vo.model_dump(by_alias=True),
         message="ok",
     )
+
+
+@router.post(
+    "/jobs/{job_id}/resume",
+    response_model=BaseResponse[None],
+    summary="续跑已中断的语音评测任务",
+)
+async def resume_job(
+    job_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_async_db),
+):
+    user = await UserService.get_login_user(db, request)
+    await UnifiedEvalJobService.resume_job(user.id, job_id)
+    return BaseResponse(code=0, data=None, message="ok")
+
+
+@router.post(
+    "/jobs/{job_id}/pause",
+    response_model=BaseResponse[None],
+    summary="暂停语音评测任务",
+)
+async def pause_job(
+    job_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_async_db),
+):
+    user = await UserService.get_login_user(db, request)
+    await UnifiedEvalJobService.pause_job(user.id, job_id)
+    return BaseResponse(code=0, data=None, message="ok")
+
+
+@router.post(
+    "/jobs/{job_id}/rerun",
+    response_model=BaseResponse[None],
+    summary="重跑语音评测任务",
+)
+async def rerun_job(
+    job_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_async_db),
+):
+    user = await UserService.get_login_user(db, request)
+    await UnifiedEvalJobService.rerun_job(user.id, job_id)
+    return BaseResponse(code=0, data=None, message="ok")
+
+
+@router.patch(
+    "/jobs/{job_id}/display-name",
+    response_model=BaseResponse[None],
+    summary="更新任务显示名称",
+)
+async def update_display_name(
+    job_id: str,
+    body: EvalJobDisplayNameUpdateVO,
+    request: Request,
+    db: AsyncSession = Depends(get_async_db),
+):
+    user = await UserService.get_login_user(db, request)
+    await UnifiedEvalJobService.update_display_name(user.id, job_id, body.display_name)
+    return BaseResponse(code=0, data=None, message="ok")
 
 
 @router.get(

@@ -1,5 +1,7 @@
 import request from '@/request'
 import type { UploadProps } from 'ant-design-vue'
+import type { EvalJobCommonFields, EvalJobCreateMeta } from '@/types/evalJobCommon'
+import { appendCreateMeta, updateEvalJobDisplayName, pauseEvalJob, rerunEvalJob } from '@/api/evalJobApiHelpers'
 
 type BaseResponse<T = unknown> = {
   code: number
@@ -105,7 +107,13 @@ export type UnifiedEvalJob = {
   result?: Record<string, unknown>
   createdAt?: string
   finishedAt?: string
-}
+  completedCount?: number
+  totalCount?: number
+  canResume?: boolean
+  interruptedAt?: string
+  hasCheckpoint?: boolean
+  model?: string
+} & EvalJobCommonFields
 
 export type ModelEvalSlot = {
   id: string
@@ -141,7 +149,11 @@ export async function evaluateSingleWav(file: File) {
   return unwrap(res)
 }
 
-export async function createUnifiedEvalJob(files: File[], archive?: File) {
+export async function createUnifiedEvalJob(
+  files: File[],
+  archive?: File,
+  meta?: EvalJobCreateMeta,
+) {
   const form = new FormData()
   for (const f of files) {
     form.append('files', f)
@@ -149,6 +161,7 @@ export async function createUnifiedEvalJob(files: File[], archive?: File) {
   if (archive) {
     form.append('archive', archive)
   }
+  appendCreateMeta(form, meta)
   const res = await request.post<BaseResponse<string>>('/unified-eval/jobs', form, {
     timeout: 120000,
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -156,7 +169,7 @@ export async function createUnifiedEvalJob(files: File[], archive?: File) {
   return unwrap(res)
 }
 
-export async function createMultiModelEvalJob(slots: ModelEvalSlot[]) {
+export async function createMultiModelEvalJob(slots: ModelEvalSlot[], meta?: EvalJobCreateMeta) {
   const form = new FormData()
   for (const slot of slots) {
     form.append('modelNames', slot.modelName.trim())
@@ -171,6 +184,7 @@ export async function createMultiModelEvalJob(slots: ModelEvalSlot[]) {
       }
     }
   })
+  appendCreateMeta(form, meta)
   const res = await request.post<BaseResponse<string>>('/unified-eval/multi-model-jobs', form, {
     timeout: 300000,
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -186,6 +200,23 @@ export async function getUnifiedEvalJob(jobId: string) {
 export async function listUnifiedEvalJobs() {
   const res = await request.get<BaseResponse<{ jobs: UnifiedEvalJob[] }>>('/unified-eval/jobs')
   return unwrap(res)
+}
+
+export async function resumeUnifiedEvalJob(jobId: string) {
+  const res = await request.post<BaseResponse<null>>(`/unified-eval/jobs/${jobId}/resume`)
+  return unwrap(res)
+}
+
+export async function updateUnifiedEvalJobDisplayName(jobId: string, displayName: string) {
+  return updateEvalJobDisplayName('unified-eval', jobId, displayName)
+}
+
+export async function pauseUnifiedEvalJob(jobId: string) {
+  return pauseEvalJob('unified-eval', jobId)
+}
+
+export async function rerunUnifiedEvalJob(jobId: string) {
+  return rerunEvalJob('unified-eval', jobId)
 }
 
 export function getJobAudioUrl(jobId: string, wavname: string, modelName?: string) {

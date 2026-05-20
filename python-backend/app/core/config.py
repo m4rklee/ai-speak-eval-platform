@@ -66,8 +66,8 @@ class Settings(BaseSettings):
     # 北极星 2201 听力评测包目录
     LISTEN_EVAL_PACKAGE_DIR: str = ""
     LISTEN_EVAL_MAX_SAMPLES_PER_JOB: int = 2201
-    LISTEN_EVAL_REQUEST_INTERVAL_SEC: float = 1.0
-    LISTEN_EVAL_JOB_WORKERS: int = 1
+    LISTEN_EVAL_REQUEST_INTERVAL_SEC: float = 0.0
+    LISTEN_EVAL_JOB_WORKERS: int = 4
 
     # 口语回复生成（教师模式 API：音频 in → 文本 + 音频 out）
     ORAL_GEN_QUESTIONWAV_DIR: str = "/root/autodl-tmp/questionwav"
@@ -78,6 +78,9 @@ class Settings(BaseSettings):
 
     # 综合评测一站式流水线工作目录
     ORAL_COMBINED_WORK_ROOT: str = "/tmp/oral_combined_work"
+
+    # 内容/语音等文件类评测任务持久输入目录根路径
+    EVAL_JOB_DATA_ROOT: str = "/root/autodl-tmp/eval_job_data"
 
     @property
     def content_eval_question_dir(self) -> str:

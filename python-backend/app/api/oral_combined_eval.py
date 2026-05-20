@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_async_db
 from app.schemas.common import BaseResponse
+from app.schemas.eval_job_common import EvalJobDisplayNameUpdateVO
 from app.schemas.oral_combined_eval import (
     OralCombinedFromOralGenVO,
     OralCombinedHealthVO,
@@ -37,9 +38,19 @@ async def create_job(
     db: AsyncSession = Depends(get_async_db),
     files: list[UploadFile] = File(default=[]),
     archive: Optional[UploadFile] = File(default=None),
+    display_name: Optional[str] = Form(default=None, alias="displayName"),
+    eval_rounds: Optional[int] = Form(default=None, alias="evalRounds"),
+    judge_model: Optional[str] = Form(default=None, alias="judgeModel"),
 ):
     user = await UserService.get_login_user(db, request)
-    job_id = await OralCombinedEvalJobService.create_job(user.id, files, archive)
+    job_id = await OralCombinedEvalJobService.create_job(
+        user.id,
+        files,
+        archive,
+        display_name=display_name,
+        eval_rounds=eval_rounds,
+        judge_model=judge_model,
+    )
     return BaseResponse(code=0, data=job_id, message="ok")
 
 
@@ -63,6 +74,9 @@ async def create_pipeline_job(
         seed=body.seed,
         request_interval=body.request_interval,
         auto_start_eval=body.auto_start_eval,
+        display_name=body.display_name,
+        eval_rounds=body.eval_rounds,
+        judge_model=body.judge_model,
     )
     return BaseResponse(code=0, data=job_id, message="ok")
 
@@ -78,6 +92,9 @@ async def create_pipeline_job_upload(
     model: str = Form(...),
     auto_start_eval: bool = Form(default=True),
     request_interval: Optional[float] = Form(default=None),
+    display_name: Optional[str] = Form(default=None, alias="displayName"),
+    eval_rounds: Optional[int] = Form(default=None, alias="evalRounds"),
+    judge_model: Optional[str] = Form(default=None, alias="judgeModel"),
     files: list[UploadFile] = File(...),
 ):
     user = await UserService.get_login_user(db, request)
@@ -88,6 +105,9 @@ async def create_pipeline_job_upload(
         auto_start_eval=auto_start_eval,
         request_interval=request_interval,
         files=files,
+        display_name=display_name,
+        eval_rounds=eval_rounds,
+        judge_model=judge_model,
     )
     return BaseResponse(code=0, data=job_id, message="ok")
 
@@ -110,6 +130,51 @@ async def create_from_oral_gen(
         auto_start_eval=body.auto_start_eval,
     )
     return BaseResponse(code=0, data=job_id, message="ok")
+
+
+@router.post(
+    "/jobs/{job_id}/resume",
+    response_model=BaseResponse[None],
+    summary="续跑已中断或待评测的综合评测任务",
+)
+async def resume_job(
+    job_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_async_db),
+):
+    user = await UserService.get_login_user(db, request)
+    await OralCombinedEvalJobService.resume_job(user.id, job_id)
+    return BaseResponse(code=0, data=None, message="ok")
+
+
+@router.post(
+    "/jobs/{job_id}/pause",
+    response_model=BaseResponse[None],
+    summary="暂停综合评测任务",
+)
+async def pause_job(
+    job_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_async_db),
+):
+    user = await UserService.get_login_user(db, request)
+    await OralCombinedEvalJobService.pause_job(user.id, job_id)
+    return BaseResponse(code=0, data=None, message="ok")
+
+
+@router.post(
+    "/jobs/{job_id}/rerun",
+    response_model=BaseResponse[None],
+    summary="重跑综合评测任务",
+)
+async def rerun_job(
+    job_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_async_db),
+):
+    user = await UserService.get_login_user(db, request)
+    await OralCombinedEvalJobService.rerun_job(user.id, job_id)
+    return BaseResponse(code=0, data=None, message="ok")
 
 
 @router.post(
@@ -146,6 +211,22 @@ async def list_jobs(
         data=vo.model_dump(by_alias=True),
         message="ok",
     )
+
+
+@router.patch(
+    "/jobs/{job_id}/display-name",
+    response_model=BaseResponse[None],
+    summary="更新任务显示名称",
+)
+async def update_display_name(
+    job_id: str,
+    body: EvalJobDisplayNameUpdateVO,
+    request: Request,
+    db: AsyncSession = Depends(get_async_db),
+):
+    user = await UserService.get_login_user(db, request)
+    await OralCombinedEvalJobService.update_display_name(user.id, job_id, body.display_name)
+    return BaseResponse(code=0, data=None, message="ok")
 
 
 @router.get(

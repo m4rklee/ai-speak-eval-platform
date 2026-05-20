@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_async_db
 from app.schemas.common import BaseResponse
+from app.schemas.eval_job_common import EvalJobDisplayNameUpdateVO, EvalJobRuntimeOptionsVO
 from app.schemas.listen_eval import (
     ListenEvalHealthVO,
     ListenEvalJobCreateVO,
@@ -41,8 +42,26 @@ async def create_job(
         seed=body.seed,
         request_interval=body.request_interval,
         workers=body.workers,
+        display_name=body.display_name,
+        eval_rounds=body.eval_rounds,
     )
     return BaseResponse(code=0, data=job_id, message="ok")
+
+
+@router.patch(
+    "/jobs/{job_id}/display-name",
+    response_model=BaseResponse[None],
+    summary="更新任务显示名称",
+)
+async def update_display_name(
+    job_id: str,
+    body: EvalJobDisplayNameUpdateVO,
+    request: Request,
+    db: AsyncSession = Depends(get_async_db),
+):
+    user = await UserService.get_login_user(db, request)
+    await ListenEvalJobService.update_display_name(user.id, job_id, body.display_name)
+    return BaseResponse(code=0, data=None, message="ok")
 
 
 @router.get(
@@ -83,3 +102,63 @@ async def get_job(
         data=ListenEvalJobVO.model_validate(data).model_dump(by_alias=True),
         message="ok",
     )
+
+
+@router.post(
+    "/jobs/{job_id}/resume",
+    response_model=BaseResponse[None],
+    summary="续跑已中断的听力评测任务",
+)
+async def resume_job(
+    job_id: str,
+    request: Request,
+    body: EvalJobRuntimeOptionsVO | None = None,
+    db: AsyncSession = Depends(get_async_db),
+):
+    user = await UserService.get_login_user(db, request)
+    opts = body or EvalJobRuntimeOptionsVO()
+    await ListenEvalJobService.resume_job(
+        user.id,
+        job_id,
+        workers=opts.workers,
+        request_interval=opts.request_interval,
+    )
+    return BaseResponse(code=0, data=None, message="ok")
+
+
+@router.post(
+    "/jobs/{job_id}/pause",
+    response_model=BaseResponse[None],
+    summary="暂停听力评测任务",
+)
+async def pause_job(
+    job_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_async_db),
+):
+    user = await UserService.get_login_user(db, request)
+    await ListenEvalJobService.pause_job(user.id, job_id)
+    return BaseResponse(code=0, data=None, message="ok")
+
+
+@router.post(
+    "/jobs/{job_id}/rerun",
+    response_model=BaseResponse[None],
+    summary="重跑听力评测任务",
+)
+async def rerun_job(
+    job_id: str,
+    request: Request,
+    body: EvalJobRuntimeOptionsVO | None = None,
+    db: AsyncSession = Depends(get_async_db),
+):
+    user = await UserService.get_login_user(db, request)
+    opts = body or EvalJobRuntimeOptionsVO()
+    await ListenEvalJobService.rerun_job(
+        user.id,
+        job_id,
+        workers=opts.workers,
+        request_interval=opts.request_interval,
+        skip_completed=bool(opts.skip_completed),
+    )
+    return BaseResponse(code=0, data=None, message="ok")

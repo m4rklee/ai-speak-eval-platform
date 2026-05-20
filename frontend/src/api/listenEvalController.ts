@@ -1,4 +1,6 @@
 import request from '@/request'
+import type { EvalJobCommonFields, EvalJobCreateMeta, EvalJobRuntimeOptions } from '@/types/evalJobCommon'
+import { updateEvalJobDisplayName, pauseEvalJob, rerunEvalJob } from '@/api/evalJobApiHelpers'
 
 type BaseResponse<T = unknown> = {
   code: number
@@ -74,13 +76,20 @@ export type ListenEvalJob = {
   totalSamples: number
   model?: string
   sampleMode?: string
+  workers?: number
+  requestInterval?: number
   error?: string
   progressDetail?: ListenEvalProgressDetail
   summary?: ListenEvalSummary
   perFile?: ListenEvalPerRow[]
   createdAt?: string
   finishedAt?: string
-}
+  completedCount?: number
+  totalCount?: number
+  canResume?: boolean
+  interruptedAt?: string
+  hasCheckpoint?: boolean
+} & EvalJobCommonFields
 
 function unwrap<T>(res: { data: BaseResponse<T> }): T {
   const body = res.data
@@ -102,7 +111,7 @@ export type ListenEvalJobCreate = {
   seed?: number
   requestInterval?: number
   workers?: number
-}
+} & EvalJobCreateMeta
 
 export async function createListenEvalJob(body: ListenEvalJobCreate) {
   const res = await request.post<BaseResponse<string>>('/listen-eval/jobs', body)
@@ -117,4 +126,24 @@ export async function getListenEvalJob(jobId: string) {
 export async function listListenEvalJobs() {
   const res = await request.get<BaseResponse<{ jobs: ListenEvalJob[] }>>('/listen-eval/jobs')
   return unwrap(res)
+}
+
+export async function resumeListenEvalJob(jobId: string, options?: EvalJobRuntimeOptions) {
+  const res = await request.post<BaseResponse<null>>(
+    `/listen-eval/jobs/${jobId}/resume`,
+    options ?? {},
+  )
+  return unwrap(res)
+}
+
+export async function updateListenEvalJobDisplayName(jobId: string, displayName: string) {
+  return updateEvalJobDisplayName('listen-eval', jobId, displayName)
+}
+
+export async function pauseListenEvalJob(jobId: string) {
+  return pauseEvalJob('listen-eval', jobId)
+}
+
+export async function rerunListenEvalJob(jobId: string, options?: EvalJobRuntimeOptions) {
+  return rerunEvalJob('listen-eval', jobId, options)
 }

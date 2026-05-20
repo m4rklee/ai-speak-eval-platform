@@ -111,6 +111,15 @@
           />
         </a-form-item>
 
+        <a-form-item label="任务名称（可选）">
+          <a-input
+            v-model:value="displayName"
+            placeholder="留空则自动生成"
+            :maxlength="64"
+            style="max-width: 400px"
+          />
+        </a-form-item>
+
         <a-button type="primary" :loading="jobLoading" :disabled="!canSubmit" @click="runJob">
           开始生成
         </a-button>
@@ -119,7 +128,30 @@
     </a-card>
 
     <div v-if="jobId && jobStatus" ref="jobDetailRef" class="job-detail-section">
+      <JobInterruptedBanner
+        :job="jobStatus"
+        :loading="resumeLoading"
+        @resume="handleResume"
+      />
+      <JobApiErrorAlert :job="jobStatus" />
+      <JobDisplayNameEdit
+        :job-id="jobId"
+        :display-name="jobStatus.displayName"
+        :on-save="saveJobDisplayName"
+        @saved="onDisplayNameSaved"
+      />
       <a-card v-if="showProgress" title="生成进度" class="page-section" size="small">
+        <template #extra>
+          <JobProgressActions
+            :job="jobStatus"
+            :pause-loading="pauseLoading"
+            :resume-loading="resumeLoading"
+            :rerun-loading="rerunLoading"
+            @pause="handlePause"
+            @resume="handleResume"
+            @rerun="handleRerun"
+          />
+        </template>
         <UniEvalTqdmBar
           :percent="jobStatus!.progress"
           :detail="jobStatus!.progressDetail"
@@ -128,10 +160,12 @@
         <p class="hint">
           任务 ID: {{ jobId }} · {{ jobStatus!.totalSamples }} 条 · {{ jobStatus!.model }}
         </p>
+        <JobTokenSummary :job="jobStatus" />
         <p v-if="jobStatus!.error" class="error-text">{{ jobStatus!.error }}</p>
       </a-card>
 
       <a-card v-if="summary" title="汇总" class="page-section" size="small">
+        <JobTokenSummary :job="jobStatus" />
         <a-row :gutter="16">
           <a-col :span="8">
             <a-statistic title="成功" :value="summary.success ?? 0" />
@@ -205,12 +239,23 @@ import {
   downloadOralGenZip,
   getOralGenHealth,
   getOralGenJob,
+  pauseOralGenJob,
+  rerunOralGenJob,
+  resumeOralGenJob,
+  updateOralGenJobDisplayName,
   oralGenAudioUrl,
   type OralGenHealth,
   type OralGenJob,
   type OralGenResultRow,
 } from '@/api/oralGenController'
 import UniEvalTqdmBar from '@/components/UniEvalTqdmBar.vue'
+import JobInterruptedBanner from '@/components/eval/JobInterruptedBanner.vue'
+import JobApiErrorAlert from '@/components/eval/JobApiErrorAlert.vue'
+import JobTokenSummary from '@/components/eval/JobTokenSummary.vue'
+import JobDisplayNameEdit from '@/components/eval/JobDisplayNameEdit.vue'
+import JobProgressActions from '@/components/eval/JobProgressActions.vue'
+import { useEvalJobPoll } from '@/composables/useEvalJobPoll'
+import { useEvalJobControls } from '@/composables/useEvalJobControls'
 import { useLoginUserStore } from '@/stores/loginUser'
 import {
   defaultProviderPlatform,
@@ -241,6 +286,7 @@ const sampleMode = ref<'all' | 'random'>('random')
 const sampleCount = ref(2)
 const seed = ref<number | undefined>()
 const requestInterval = ref(1)
+const displayName = ref('')
 const uploadFiles = ref<File[]>([])
 const uploadFileList = ref<UploadProps['fileList']>([])
 
@@ -249,6 +295,15 @@ const jobId = ref<string | null>(null)
 const jobStatus = ref<OralGenJob | null>(null)
 const jobDetailRef = ref<HTMLElement | null>(null)
 let pollTimer: ReturnType<typeof setInterval> | null = null
+
+const createMeta = computed(() => ({
+  displayName: displayName.value.trim() || undefined,
+}))
+
+const { handlePollTerminal, handlePollCatch } = useEvalJobPoll({
+  completedMessage: '回复生成完成',
+  onRefreshRecent: () => emit('jobs-changed'),
+})
 
 const selectedModelRecord = computed(() =>
   models.value.find((m) => m.id === selectedModelId.value),
@@ -299,6 +354,8 @@ const showProgress = computed(
     jobStatus.value &&
     (jobStatus.value.status === 'running' ||
       jobStatus.value.status === 'pending' ||
+      jobStatus.value.status === 'paused' ||
+      jobStatus.value.status === 'interrupted' ||
       jobStatus.value.status === 'failed'),
 )
 
@@ -402,14 +459,20 @@ async function pollJob(id: string) {
   try {
     const job = await getOralGenJob(id)
     jobStatus.value = job
-    if (job.status === 'completed' || job.status === 'failed') {
+    if (
+      job.status === 'completed' ||
+      job.status === 'failed' ||
+      job.status === 'interrupted' ||
+      job.status === 'paused'
+    ) {
       stopPolling()
-      emit('jobs-changed')
-      if (job.status === 'completed') message.success('回复生成完成')
-      else message.error(job.error || '任务失败')
+      if (job.status !== 'paused') {
+        handlePollTerminal(job)
+      }
     }
-  } catch {
+  } catch (e: unknown) {
     stopPolling()
+    handlePollCatch(e)
   }
 }
 
@@ -431,16 +494,19 @@ async function runJob() {
         sampleCount: sampleMode.value === 'random' ? sampleCount.value : undefined,
         seed: seed.value,
         requestInterval: requestInterval.value,
+        ...createMeta.value,
       })
     } else {
       id = await createOralGenJobUpload(
         effectiveModelId.value,
         uploadFiles.value,
         requestInterval.value,
+        createMeta.value,
       )
     }
     jobId.value = id
     message.success('任务已创建')
+    emit('jobs-changed')
     startPolling(id)
     await scrollToJobDetail()
   } catch (e: unknown) {
@@ -449,6 +515,35 @@ async function runJob() {
     jobLoading.value = false
   }
 }
+
+async function saveJobDisplayName(name: string) {
+  if (!jobId.value) return
+  await updateOralGenJobDisplayName(jobId.value, name)
+  if (jobStatus.value) {
+    jobStatus.value = { ...jobStatus.value, displayName: name }
+  }
+}
+
+function onDisplayNameSaved() {
+  emit('jobs-changed')
+}
+
+const {
+  pauseLoading,
+  rerunLoading,
+  resumeLoading,
+  handlePause,
+  handleRerun,
+  handleResume,
+} = useEvalJobControls({
+  jobId,
+  resumeJob: resumeOralGenJob,
+  pauseJob: pauseOralGenJob,
+  rerunJob: rerunOralGenJob,
+  startPolling,
+  pollJob,
+  onRefreshRecent: () => emit('jobs-changed'),
+})
 
 async function loadJob(id: string) {
   stopPolling()

@@ -417,4 +417,5 @@ def progress_detail_vo(detail: Optional[dict[str, Any]]) -> Optional[dict[str, A
         "ratePerSec": detail.get("ratePerSec", detail.get("rate_per_sec")),
         "message": detail.get("message", ""),
         "tqdmLine": detail.get("tqdmLine", detail.get("tqdm_line", "")),
+        "warningLine": detail.get("warning_line", detail.get("warningLine")),
     }

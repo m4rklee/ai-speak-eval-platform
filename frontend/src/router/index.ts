@@ -23,6 +23,12 @@ const router = createRouter({
       meta: { title: '听力评测' },
     },
     {
+      path: '/eval-reports',
+      name: 'EvalReports',
+      component: () => import('@/pages/EvalReportPage.vue'),
+      meta: { title: '评测报告' },
+    },
+    {
       path: '/content-eval',
       redirect: { path: '/oral-eval', query: { tab: 'content' } },
     },

@@ -12,6 +12,7 @@ import asyncio
 import json
 import logging
 import re
+import unicodedata
 from typing import Any, Optional
 
 from app.providers.registry import get_provider
@@ -75,9 +76,44 @@ def extract_json(feedback: str) -> dict[str, Any]:
     return {"error": "无法提取有效的JSON数据"}
 
 
+# 常见「弯引号 / 全角标点」→ ASCII，避免旧逻辑整段剔除非 ASCII 时把撇号当「非英文」误删
+_PUNCT_NORMALIZATION_MAP = str.maketrans(
+    {
+        "\u2018": "'",  # ‘
+        "\u2019": "'",  # ’
+        "\u201a": "'",  # ‚
+        "\u201b": "'",  # ‛
+        "\u2032": "'",  # ′ prime（偶有误作撇号）
+        "\u2035": "'",  # ‵
+        "\u00b4": "'",  # ´
+        "\u02bc": "'",  # modifier letter apostrophe
+        "\u02b9": "'",  # modifier letter prime
+        "\u201c": '"',  # “
+        "\u201d": '"',  # ”
+        "\u201e": '"',  # „
+        "\u201f": '"',  # ‟
+        "\u00ab": '"',  # «
+        "\u00bb": '"',  # »
+        "\u2013": "-",  # –
+        "\u2014": "-",  # —
+        "\u2212": "-",  # −
+        "\u2026": "...",  # …
+        "\u00a0": " ",  # nbsp
+    }
+)
+
+
+def _normalize_punctuation(text: str) -> str:
+    """将 Unicode 标点归一到 ASCII，保留撇号、引号、破折号语义，不误删。"""
+    s = unicodedata.normalize("NFKC", text)
+    s = s.translate(_PUNCT_NORMALIZATION_MAP)
+    s = re.sub(r"[ \t]+", " ", s)
+    return s.strip()
+
+
 def _clean_grammar_text(text: str) -> str:
-    text = text.encode("utf-8").decode("utf-8")
-    return re.sub(r"[^\x00-\x7F]+", "", text)
+    """语法维度送入 Judge 的文本：只做标点归一化与空白整理，不再整段剔除非 ASCII。"""
+    return _normalize_punctuation(text)
 
 
 def _calculate_grammar_accuracy(sentence: str, error_count: float) -> float:
@@ -111,7 +147,7 @@ def _grammar_level(score: float) -> str:
     return "非常好"
 
 
-async def _call_judge_llm(prompt: str, judge_model: str, max_retries: int = 3) -> str:
+async def _call_judge_llm(prompt: str, judge_model: str, max_retries: int = 3) -> dict[str, Any]:
     model_id = normalize_model_id(judge_model or DEFAULT_JUDGE_MODEL)
     platform, _ = split_model_id(model_id)
     vendor_id = vendor_model_id(model_id)
@@ -126,7 +162,11 @@ async def _call_judge_llm(prompt: str, judge_model: str, max_retries: int = 3) -
                 max_tokens=4000,
                 timeout=120.0,
             )
-            return (result.text or "").strip()
+            return {
+                "text": (result.text or "").strip(),
+                "inputTokens": int(result.input_tokens or 0),
+                "outputTokens": int(result.output_tokens or 0),
+            }
         except Exception as e:
             last_err = e
             logger.warning(
@@ -162,7 +202,8 @@ async def evaluate_grammar(answer: str, judge_model: str) -> dict[str, Any]:
         f"- 语序错误: V\n"
         f"确保反馈中每一行都严格遵循上述格式，以便于解析。\n"
     )
-    feedback = await _call_judge_llm(prompt, judge_model)
+    llm = await _call_judge_llm(prompt, judge_model)
+    feedback = llm["text"]
     match = re.search(r"错误数量:\s*(\d+)", feedback)
     error_count = float(match.group(1)) if match else 0.0
     accuracy = _calculate_grammar_accuracy(sentence, error_count)
@@ -175,6 +216,8 @@ async def evaluate_grammar(answer: str, judge_model: str) -> dict[str, Any]:
         "level": _grammar_level(score),
         "dim_name_cn": "语法准确表达",
         "dim_name_en": "Grammar Accuracy",
+        "inputTokens": llm["inputTokens"],
+        "outputTokens": llm["outputTokens"],
     }
 
 
@@ -213,8 +256,11 @@ async def evaluate_theme_focus(question: str, answer: str, judge_model: str) -> 
             }
             """
     )
-    feedback = await _call_judge_llm(prompt, judge_model)
-    return extract_json(feedback)
+    llm = await _call_judge_llm(prompt, judge_model)
+    parsed = extract_json(llm["text"])
+    parsed["inputTokens"] = llm["inputTokens"]
+    parsed["outputTokens"] = llm["outputTokens"]
+    return parsed
 
 
 async def evaluate_answer_clarity(question: str, answer: str, judge_model: str) -> dict[str, Any]:
@@ -274,8 +320,11 @@ async def evaluate_answer_clarity(question: str, answer: str, judge_model: str) 
 }
 """
     )
-    feedback = await _call_judge_llm(prompt, judge_model)
-    return extract_json(feedback)
+    llm = await _call_judge_llm(prompt, judge_model)
+    parsed = extract_json(llm["text"])
+    parsed["inputTokens"] = llm["inputTokens"]
+    parsed["outputTokens"] = llm["outputTokens"]
+    return parsed
 
 
 def _dimension_scores_for_composite(
@@ -342,6 +391,8 @@ async def evaluate_content_dimensions(
 
     norm_scores = _dimension_scores_for_composite(grammar, theme, clarity)
     composite = round(sum(norm_scores) / len(norm_scores), 2) if norm_scores else 0.0
+    tin = sum(int(d.get("inputTokens") or 0) for d in (grammar, theme, clarity))
+    tout = sum(int(d.get("outputTokens") or 0) for d in (grammar, theme, clarity))
 
     return {
         "status": "ok",
@@ -351,6 +402,8 @@ async def evaluate_content_dimensions(
         "composite": composite,
         "reason": _build_reason(grammar, theme, clarity),
         "judgeModel": normalize_model_id(judge_model or DEFAULT_JUDGE_MODEL),
+        "inputTokens": tin,
+        "outputTokens": tout,
         "dimensions": {
             "grammar": grammar,
             "themeFocus": theme,

@@ -32,6 +32,14 @@
     </a-card>
 
     <a-card class="section">
+      <a-form layout="inline" class="batch-meta-form">
+        <a-form-item label="任务名称（可选）">
+          <a-input v-model:value="displayName" placeholder="留空则自动生成" :maxlength="64" style="width: 200px" />
+        </a-form-item>
+        <a-form-item label="评测轮次">
+          <a-input-number v-model:value="evalRounds" :min="1" :max="5" style="width: 80px" />
+        </a-form-item>
+      </a-form>
       <a-tabs v-model:activeKey="activeTab">
         <a-tab-pane key="single" tab="单文件">
           <a-upload-dragger
@@ -61,9 +69,9 @@
           <a-upload
             :multiple="true"
             :file-list="multiFileList"
-            accept=".wav,audio/wav"
-            :before-upload="onMultiBeforeUpload"
-            @remove="onMultiRemove"
+            :accept="batchUpload.acceptMime"
+            :before-upload="batchUpload.onMultiBeforeUpload"
+            @remove="batchUpload.onMultiRemove"
           >
             <a-button>
               <UploadOutlined />
@@ -74,7 +82,7 @@
             type="primary"
             class="action-btn"
             :loading="jobLoading"
-            :disabled="!multiFiles.length || !engineReady"
+            :disabled="!batchUpload.batchReady('multi') || !engineReady"
             @click="runBatch('multi')"
           >
             提交批量任务（{{ multiFiles.length }} 个文件）
@@ -85,16 +93,16 @@
           <a-space direction="vertical" style="width: 100%">
             <div>
               <input
-                ref="dirInputRef"
+                :ref="(el) => { dirInputRef = el as HTMLInputElement | null }"
                 type="file"
                 webkitdirectory
                 directory
                 multiple
-                accept=".wav,audio/wav"
+                :accept="batchUpload.acceptMime"
                 style="display: none"
-                @change="onDirChange"
+                @change="batchUpload.onDirChange"
               />
-              <a-button @click="pickDirectory">
+              <a-button @click="batchUpload.pickDirectory">
                 <FolderOpenOutlined />
                 选择文件夹（含 wav）
               </a-button>
@@ -104,7 +112,7 @@
               :multiple="false"
               :show-upload-list="!!zipFile"
               accept=".zip"
-              :before-upload="onZipBeforeUpload"
+              :before-upload="batchUpload.onZipBeforeUpload"
               @remove="zipFile = null"
             >
               <a-button>
@@ -115,7 +123,7 @@
             <a-button
               type="primary"
               :loading="jobLoading"
-              :disabled="(!dirFiles.length && !zipFile) || !engineReady"
+              :disabled="!batchUpload.batchReady('dir') || !engineReady"
               @click="runBatch('dir')"
             >
               提交任务
@@ -124,100 +132,45 @@
         </a-tab-pane>
 
         <a-tab-pane key="multiModel" tab="多模型对比">
-          <p class="hint">为每个模型单独上传 answer wav，按文件名对齐同一题目，提交后输出各模型得分对比。</p>
-          <div v-for="(slot, idx) in modelSlots" :key="slot.id" class="model-slot">
-            <div class="model-slot-header">
-              <span class="model-slot-label">模型 {{ idx + 1 }}</span>
-              <a-button
-                v-if="modelSlots.length > 2"
-                type="link"
-                danger
-                size="small"
-                @click="removeModelSlot(slot.id)"
-              >
-                删除
-              </a-button>
-            </div>
-            <a-input
-              v-model:value="slot.modelName"
-              placeholder="模型名称，如 GPT-4o-Audio"
-              style="max-width: 360px; margin-bottom: 8px"
-            />
-            <a-space wrap>
-              <a-upload
-                :multiple="true"
-                :file-list="slot.fileList"
-                accept=".wav,audio/wav"
-                :before-upload="slotBeforeUpload(slot.id)"
-                @remove="slotRemove(slot.id)"
-              >
-                <a-button size="small">
-                  <UploadOutlined />
-                  选择 wav
-                </a-button>
-              </a-upload>
-              <input
-                :ref="(el) => setSlotDirRef(slot.id, el as HTMLInputElement | null)"
-                type="file"
-                webkitdirectory
-                directory
-                multiple
-                accept=".wav,audio/wav"
-                style="display: none"
-                @change="(e) => onSlotDirChange(slot.id, e)"
-              />
-              <a-button size="small" @click="pickSlotDirectory(slot.id)">
-                <FolderOpenOutlined />
-                选文件夹
-              </a-button>
-              <a-upload
-                :multiple="false"
-                :show-upload-list="!!slot.zipFile"
-                accept=".zip"
-                :before-upload="slotZipUpload(slot.id)"
-                @remove="slot.zipFile = null"
-              >
-                <a-button size="small">
-                  <FileZipOutlined />
-                  zip
-                </a-button>
-              </a-upload>
-            </a-space>
-            <p class="hint">
-              <span v-if="slot.zipFile">已选 zip：{{ slot.zipFile.name }}</span>
-              <span v-else-if="slot.dirFiles.length && slot.dirFolderName">
-                已选文件夹「{{ slot.dirFolderName }}」· {{ slot.dirFiles.length }} 个 wav
-              </span>
-              <span v-else-if="slot.files.length">
-                已选 {{ slot.files.length }} 个 wav
-              </span>
-              <span v-else-if="slot.dirFiles.length">
-                已选 {{ slot.dirFiles.length }} 个 wav
-              </span>
-            </p>
-          </div>
-          <a-space style="margin-top: 12px">
-            <a-button
-              v-if="modelSlots.length < maxModelsPerJob"
-              @click="addModelSlot"
-            >
-              + 添加模型
-            </a-button>
-            <a-button
-              type="primary"
-              :loading="multiModelLoading"
-              :disabled="!canSubmitMultiModel"
-              @click="runMultiModelBatch"
-            >
-              提交多模型评测（{{ modelSlots.length }} 模型，共 {{ totalMultiModelFiles }} 个 wav）
-            </a-button>
-          </a-space>
-          <p v-if="!loginUserStore.loginUser?.id" class="hint">请先登录后再提交评测</p>
+          <EvalMultiModelSlots
+            accept-ext="wav"
+            file-label="wav"
+            :max-models="maxModelsPerJob"
+            :loading="multiModelLoading"
+            :submit-disabled="!engineReady"
+            :show-login-hint="!loginUserStore.loginUser?.id"
+            @submit="runMultiModelBatch"
+          />
         </a-tab-pane>
       </a-tabs>
     </a-card>
 
+    <JobInterruptedBanner
+      v-if="jobId && jobStatus"
+      :job="jobStatus"
+      :loading="resumeLoading"
+      @resume="handleResume"
+    />
+    <JobApiErrorAlert v-if="jobId && jobStatus" :job="jobStatus" />
+    <JobDisplayNameEdit
+      v-if="jobId && jobStatus"
+      :job-id="jobId"
+      :display-name="jobStatus.displayName"
+      :on-save="saveJobDisplayName"
+      @saved="onDisplayNameSaved"
+    />
     <a-card v-if="showProgress" title="评测进度" class="section" size="small">
+      <template #extra>
+        <JobProgressActions
+          :job="jobStatus"
+          :pause-loading="pauseLoading"
+          :resume-loading="resumeLoading"
+          :rerun-loading="rerunLoading"
+          @pause="handlePause"
+          @resume="handleResume"
+          @rerun="handleRerun"
+        />
+      </template>
       <UniEvalTqdmBar
         :percent="jobStatus!.progress"
         :detail="jobStatus!.progressDetail"
@@ -227,11 +180,16 @@
         任务 ID: {{ jobId }}
         <span v-if="isMultiModelJob"> · {{ jobStatus!.modelCount }} 模型</span>
         · {{ jobStatus!.totalFiles }} 个文件
+        <span v-if="jobStatus!.evalRounds && jobStatus!.evalRounds > 1">
+          · 轮次 {{ jobStatus!.evalRounds }}
+        </span>
       </p>
+      <JobTokenSummary :job="jobStatus" />
       <p v-if="jobStatus!.error" class="error-text">{{ jobStatus!.error }}</p>
     </a-card>
 
     <a-card v-if="compareRows.length" title="模型对比汇总" class="section" size="small">
+      <JobTokenSummary :job="jobStatus" />
       <a-space style="margin-bottom: 12px">
         <a-button size="small" @click="exportJson">导出 JSON</a-button>
         <a-button size="small" @click="exportCsv">导出 CSV</a-button>
@@ -345,12 +303,25 @@ import {
   getJobAudioUrl,
   getUnifiedEvalHealth,
   getUnifiedEvalJob,
+  pauseUnifiedEvalJob,
+  rerunUnifiedEvalJob,
+  resumeUnifiedEvalJob,
+  updateUnifiedEvalJobDisplayName,
   listUnifiedEvalJobs,
   type ModelEvalSlot,
   type UnifiedEvalHealth,
   type UnifiedEvalJob,
 } from '@/api/unifiedEvalController'
+import EvalMultiModelSlots from '@/components/eval/EvalMultiModelSlots.vue'
 import UniEvalTqdmBar from '@/components/UniEvalTqdmBar.vue'
+import JobInterruptedBanner from '@/components/eval/JobInterruptedBanner.vue'
+import JobApiErrorAlert from '@/components/eval/JobApiErrorAlert.vue'
+import JobTokenSummary from '@/components/eval/JobTokenSummary.vue'
+import JobDisplayNameEdit from '@/components/eval/JobDisplayNameEdit.vue'
+import JobProgressActions from '@/components/eval/JobProgressActions.vue'
+import { useEvalJobPoll } from '@/composables/useEvalJobPoll'
+import { useEvalJobControls } from '@/composables/useEvalJobControls'
+import { useEvalBatchUpload } from '@/composables/useEvalBatchUpload'
 
 const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 const emit = defineEmits<{ (e: 'jobs-changed'): void }>()
@@ -362,46 +333,30 @@ const healthLoading = ref(false)
 const activeTab = ref('single')
 const singleFile = ref<File | null>(null)
 const singleLoading = ref(false)
-const multiFiles = ref<File[]>([])
-const multiFileList = ref<UploadProps['fileList']>([])
-const dirFiles = ref<File[]>([])
-const dirFolderName = ref('')
-const zipFile = ref<File | null>(null)
-const dirInputRef = ref<HTMLInputElement | null>(null)
+const batchUpload = useEvalBatchUpload('wav')
+const { multiFileList, dirInputRef, multiFiles, dirFiles, zipFile, dirSelectionHint } = batchUpload
 const jobLoading = ref(false)
 const multiModelLoading = ref(false)
 const maxModelsPerJob = 10
-let slotIdSeq = 0
-
-function folderNameFromFileList(files: File[]): string {
-  if (!files.length) return ''
-  const rel = (files[0] as File & { webkitRelativePath?: string }).webkitRelativePath || ''
-  const normalized = rel.replace(/\\/g, '/')
-  const slash = normalized.indexOf('/')
-  return slash > 0 ? normalized.slice(0, slash) : ''
-}
-
-function createEmptySlot(): ModelEvalSlot {
-  return {
-    id: `slot-${++slotIdSeq}`,
-    modelName: '',
-    files: [],
-    fileList: [],
-    dirFiles: [],
-    dirFolderName: '',
-    zipFile: null,
-  }
-}
-
-const modelSlots = ref<ModelEvalSlot[]>([createEmptySlot(), createEmptySlot()])
-const slotDirRefs = ref<Record<string, HTMLInputElement | null>>({})
 const detailModelFilter = ref<string | undefined>(undefined)
 const jobId = ref('')
 const jobStatus = ref<UnifiedEvalJob | null>(null)
 const recentJobs = ref<UnifiedEvalJob[]>([])
+const displayName = ref('')
+const evalRounds = ref(1)
 const playingKey = ref('')
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let audioEl: HTMLAudioElement | null = null
+
+const createMeta = computed(() => ({
+  displayName: displayName.value.trim() || undefined,
+  evalRounds: evalRounds.value,
+}))
+
+const { handlePollTerminal, handlePollCatch } = useEvalJobPoll({
+  completedMessage: '批量评测完成',
+  onRefreshRecent: () => afterJobCreated(),
+})
 
 const canPlayAudio = computed(
   () => !!jobId.value && (jobStatus.value?.audioAvailable ?? jobStatus.value?.status === 'completed'),
@@ -435,7 +390,7 @@ const showProgress = computed(
   () =>
     jobId.value &&
     jobStatus.value &&
-    ['pending', 'running', 'completed', 'failed'].includes(jobStatus.value.status),
+    ['pending', 'running', 'paused', 'interrupted', 'completed', 'failed'].includes(jobStatus.value.status),
 )
 
 const displaySummary = computed(() => jobStatus.value?.summary ?? null)
@@ -556,141 +511,17 @@ function formatJobDescription(item: UnifiedEvalJob) {
   return parts.join(' · ')
 }
 
-function slotFileCount(slot: ModelEvalSlot): number | 'zip' {
-  if (slot.zipFile) return 'zip'
-  return slot.files.length || slot.dirFiles.length
-}
-
-function findSlot(id: string) {
-  return modelSlots.value.find((s) => s.id === id)
-}
-
-function setSlotDirRef(id: string, el: HTMLInputElement | null) {
-  slotDirRefs.value[id] = el
-}
-
-function pickSlotDirectory(id: string) {
-  slotDirRefs.value[id]?.click()
-}
-
-function onSlotMultiBeforeUpload(slotId: string, file: File) {
-  const slot = findSlot(slotId)
-  if (!slot) return false
-  if (!file.name.toLowerCase().endsWith('.wav')) {
-    message.warning('仅支持 wav')
-    return false
-  }
-  slot.zipFile = null
-  slot.dirFiles = []
-  slot.dirFolderName = ''
-  slot.files.push(file)
-  slot.fileList = [
-    ...(slot.fileList || []),
-    { uid: `${Date.now()}-${file.name}`, name: file.name, status: 'done' },
-  ]
-  return false
-}
-
-function onSlotMultiRemove(slotId: string, file: { name?: string }) {
-  const slot = findSlot(slotId)
-  if (!slot) return
-  const name = file.name
-  slot.files = slot.files.filter((f) => f.name !== name)
-  slot.fileList = (slot.fileList || []).filter((f) => f.name !== name)
-}
-
-function onSlotDirChange(slotId: string, e: Event) {
-  const slot = findSlot(slotId)
-  if (!slot) return
-  const input = e.target as HTMLInputElement
-  const list = input.files
-  if (!list) return
-  slot.zipFile = null
-  slot.files = []
-  slot.fileList = []
-  slot.dirFiles = Array.from(list).filter((f) => f.name.toLowerCase().endsWith('.wav'))
-  slot.dirFolderName = folderNameFromFileList(slot.dirFiles)
-  const folderLabel = slot.dirFolderName ? `文件夹「${slot.dirFolderName}」` : '文件夹'
-  message.info(`已选择 ${folderLabel}，共 ${slot.dirFiles.length} 个 wav`)
-  input.value = ''
-}
-
-function onSlotZipBeforeUpload(slotId: string, file: File) {
-  const slot = findSlot(slotId)
-  if (!slot) return false
-  slot.zipFile = file
-  slot.files = []
-  slot.fileList = []
-  slot.dirFiles = []
-  slot.dirFolderName = ''
-  return false
-}
-
-function slotBeforeUpload(slotId: string): UploadProps['beforeUpload'] {
-  return (file) => onSlotMultiBeforeUpload(slotId, file as File)
-}
-
-function slotRemove(slotId: string): UploadProps['onRemove'] {
-  return (file) => onSlotMultiRemove(slotId, file)
-}
-
-function slotZipUpload(slotId: string): UploadProps['beforeUpload'] {
-  return (file) => onSlotZipBeforeUpload(slotId, file as File)
-}
-
-function addModelSlot() {
-  if (modelSlots.value.length >= maxModelsPerJob) return
-  modelSlots.value.push(createEmptySlot())
-}
-
-function removeModelSlot(id: string) {
-  if (modelSlots.value.length <= 2) return
-  modelSlots.value = modelSlots.value.filter((s) => s.id !== id)
-  delete slotDirRefs.value[id]
-}
-
-const dirSelectionHint = computed(() => {
-  const n = dirFiles.value.length
-  if (!n) return ''
-  const name = dirFolderName.value
-  return name ? `已选文件夹「${name}」· ${n} 个 wav` : `已选 ${n} 个 wav`
-})
-
-const totalMultiModelFiles = computed(() =>
-  modelSlots.value.reduce((sum, slot) => {
-    const count = slotFileCount(slot)
-    if (count === 'zip') return sum
-    return sum + count
-  }, 0),
-)
-
-const canSubmitMultiModel = computed(() => {
-  if (!engineReady.value) return false
-  if (modelSlots.value.length < 2) return false
-  const names = modelSlots.value.map((s) => s.modelName.trim()).filter(Boolean)
-  if (names.length !== modelSlots.value.length) return false
-  if (new Set(names).size !== names.length) return false
-  return modelSlots.value.every((slot) => {
-    const count = slotFileCount(slot)
-    return count === 'zip' || count > 0
-  })
-})
-
-async function runMultiModelBatch() {
+async function runMultiModelBatch(slots: ModelEvalSlot[]) {
   if (!requireLogin()) return
   if (!engineReady.value) {
     warnEngineNotReady()
-    return
-  }
-  if (!canSubmitMultiModel.value) {
-    message.warning('请填写不重复的模型名，且每个模型至少上传 wav 或 zip')
     return
   }
   multiModelLoading.value = true
   jobStatus.value = null
   detailModelFilter.value = undefined
   try {
-    const id = await createMultiModelEvalJob(modelSlots.value)
+    const id = await createMultiModelEvalJob(slots, createMeta.value)
     jobId.value = id
     message.success('多模型任务已创建')
     startPolling(id)
@@ -776,51 +607,9 @@ const onSingleBeforeUpload: UploadProps['beforeUpload'] = (file) => {
   return false
 }
 
-const onMultiBeforeUpload: UploadProps['beforeUpload'] = (file) => {
-  const f = file as File
-  if (!f.name.toLowerCase().endsWith('.wav')) {
-    message.warning('仅支持 wav')
-    return false
-  }
-  multiFiles.value.push(f)
-  multiFileList.value = [
-    ...(multiFileList.value || []),
-    { uid: `${Date.now()}-${f.name}`, name: f.name, status: 'done' },
-  ]
-  return false
-}
-
-const onMultiRemove: UploadProps['onRemove'] = (file) => {
-  const name = file.name
-  multiFiles.value = multiFiles.value.filter((f) => f.name !== name)
-  multiFileList.value = (multiFileList.value || []).filter((f) => f.name !== name)
-}
-
-function pickDirectory() {
-  dirInputRef.value?.click()
-}
-
-function onDirChange(e: Event) {
-  const input = e.target as HTMLInputElement
-  const list = input.files
-  if (!list) return
-  dirFiles.value = Array.from(list).filter((f) => f.name.toLowerCase().endsWith('.wav'))
-  dirFolderName.value = folderNameFromFileList(dirFiles.value)
-  const folderLabel = dirFolderName.value ? `文件夹「${dirFolderName.value}」` : '文件夹'
-  message.info(`已选择 ${folderLabel}，共 ${dirFiles.value.length} 个 wav`)
-  input.value = ''
-}
-
-const onZipBeforeUpload: UploadProps['beforeUpload'] = (file) => {
-  zipFile.value = file as File
-  dirFiles.value = []
-  dirFolderName.value = ''
-  return false
-}
-
 async function submitEvalJob(files: File[], archive?: File) {
   jobStatus.value = null
-  const id = await createUnifiedEvalJob(files, archive)
+  const id = await createUnifiedEvalJob(files, archive, createMeta.value)
   jobId.value = id
   message.success('任务已创建')
   startPolling(id)
@@ -849,8 +638,7 @@ async function runBatch(mode: 'multi' | 'dir') {
     warnEngineNotReady()
     return
   }
-  const files = mode === 'multi' ? multiFiles.value : dirFiles.value
-  const archive = mode === 'dir' ? zipFile.value : null
+  const { files, archive } = batchUpload.filesForSubmit(mode)
   if (!files.length && !archive) {
     message.warning('请选择文件或 zip')
     return
@@ -882,16 +670,56 @@ async function pollJob(id: string) {
   try {
     const job = await getUnifiedEvalJob(id)
     jobStatus.value = job
-    if (job.status === 'completed' || job.status === 'failed') {
+    if (
+      job.status === 'completed' ||
+      job.status === 'failed' ||
+      job.status === 'interrupted' ||
+      job.status === 'paused'
+    ) {
       stopPolling()
-      if (job.status === 'completed') message.success('批量评测完成')
-      else message.error(job.error || '任务失败')
-      await afterJobCreated()
+      if (job.status !== 'paused') {
+        handlePollTerminal(job)
+      }
     }
-  } catch {
+  } catch (e: unknown) {
     stopPolling()
+    handlePollCatch(e)
   }
 }
+
+async function saveJobDisplayName(name: string) {
+  if (!jobId.value) return
+  await updateUnifiedEvalJobDisplayName(jobId.value, name)
+  if (jobStatus.value) {
+    jobStatus.value = { ...jobStatus.value, displayName: name }
+  }
+}
+
+function onDisplayNameSaved() {
+  void loadRecentJobs()
+  emit('jobs-changed')
+}
+
+const {
+  pauseLoading,
+  rerunLoading,
+  resumeLoading,
+  handlePause,
+  handleRerun,
+  handleResume,
+} = useEvalJobControls({
+  jobId,
+  resumeJob: resumeUnifiedEvalJob,
+  pauseJob: pauseUnifiedEvalJob,
+  rerunJob: rerunUnifiedEvalJob,
+  startPolling,
+  pollJob,
+  onRefreshRecent: () => {
+    void loadRecentJobs()
+    emit('jobs-changed')
+  },
+  onResumeSuccess: () => afterJobCreated(),
+})
 
 async function loadJob(id: string) {
   if (!requireLogin()) return
@@ -1066,24 +894,5 @@ onUnmounted(() => {
 
 .wav-name {
   word-break: break-all;
-}
-
-.model-slot {
-  border: 1px solid #f0f0f0;
-  border-radius: 8px;
-  padding: 12px 16px;
-  margin-bottom: 12px;
-  background: #fafafa;
-}
-
-.model-slot-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.model-slot-label {
-  font-weight: 500;
 }
 </style>

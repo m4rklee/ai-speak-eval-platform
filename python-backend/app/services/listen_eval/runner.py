@@ -3,11 +3,11 @@ from __future__ import annotations
 
 import base64
 import logging
-from pathlib import Path
 from typing import Any
 
 from app.core.errors import BusinessException, ErrorCode
 from app.providers.registry import get_provider
+from app.utils.audio_input import prepare_input_audio_bytes
 from app.utils.listen_eval_benchmark import resolve_audio_path
 from app.utils.model_id import normalize_model_id, split_model_id, vendor_model_id
 
@@ -34,13 +34,6 @@ def build_instruction(item: dict[str, Any], prompt_prefix: str = DEFAULT_PROMPT)
     return "\n".join(lines)
 
 
-def guess_audio_format(audio_path: str) -> str:
-    suffix = Path(audio_path).suffix.lower().lstrip(".")
-    if suffix in {"wav", "mp3", "flac", "ogg", "m4a", "mp4"}:
-        return suffix if suffix != "mp4" else "m4a"
-    return "wav"
-
-
 async def infer_item(
     model_id: str,
     item: dict[str, Any],
@@ -63,11 +56,12 @@ async def infer_item(
     except OSError as e:
         return {**item, "response": "", "error": f"读取音频失败: {e}"[:300]}
 
-    if not audio_bytes:
-        return {**item, "response": "", "error": "音频文件为空"}
+    try:
+        payload_bytes, fmt = prepare_input_audio_bytes(audio_bytes, path_hint=audio_path)
+    except ValueError as e:
+        return {**item, "response": "", "error": str(e)[:300]}
 
-    fmt = guess_audio_format(audio_path)
-    b64 = base64.b64encode(audio_bytes).decode("utf-8")
+    b64 = base64.b64encode(payload_bytes).decode("utf-8")
     instruction = build_instruction(item)
 
     messages = [
@@ -101,6 +95,8 @@ async def infer_item(
             "error": None,
             "model": normalized,
             "inputMode": "audio",
+            "input_tokens": int(result.input_tokens or 0),
+            "output_tokens": int(result.output_tokens or 0),
         }
     except Exception as e:
         logger.warning("listen infer failed id=%s: %s", item.get("id"), e)
@@ -110,6 +106,8 @@ async def infer_item(
             "error": str(e)[:300],
             "model": normalized,
             "inputMode": "audio",
+            "input_tokens": 0,
+            "output_tokens": 0,
         }
 
 

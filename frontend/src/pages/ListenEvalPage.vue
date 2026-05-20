@@ -78,6 +78,18 @@
         </a-form-item>
         <a-collapse ghost>
           <a-collapse-panel key="adv" header="高级选项">
+            <a-form-item label="任务名称（可选）">
+              <a-input
+                v-model:value="displayName"
+                placeholder="留空则自动生成"
+                :maxlength="64"
+                style="max-width: 400px"
+              />
+            </a-form-item>
+            <a-form-item label="评测轮次">
+              <a-input-number v-model:value="evalRounds" :min="1" :max="5" style="width: 120px" />
+              <span class="hint" style="margin-left: 8px">每题重复评测 1–5 次后汇总</span>
+            </a-form-item>
             <a-form-item label="请求间隔（秒）">
               <a-input-number
                 v-model:value="requestInterval"
@@ -88,7 +100,10 @@
               />
             </a-form-item>
             <a-form-item label="并发 workers">
-              <a-input-number v-model:value="workers" :min="1" :max="8" style="width: 120px" />
+              <a-input-number v-model:value="workers" :min="1" :max="16" style="width: 120px" />
+              <span class="hint" style="margin-left: 8px">
+                同时处理的题目数；续跑 / 重跑时会使用此处与「请求间隔」的最新值
+              </span>
             </a-form-item>
           </a-collapse-panel>
         </a-collapse>
@@ -105,17 +120,46 @@
     </a-card>
 
     <div v-if="jobId && jobStatus" ref="jobDetailRef" class="job-detail-section">
+      <JobInterruptedBanner
+        :job="jobStatus"
+        :loading="resumeLoading"
+        @resume="handleResume"
+      />
+      <JobApiErrorAlert :job="jobStatus" />
+      <JobDisplayNameEdit
+        :job-id="jobId"
+        :display-name="jobStatus.displayName"
+        :on-save="saveJobDisplayName"
+        @saved="onDisplayNameSaved"
+      />
       <a-card v-if="showProgress" title="评测进度" class="page-section" size="small">
+        <template #extra>
+          <JobProgressActions
+            :job="jobStatus"
+            :pause-loading="pauseLoading"
+            :resume-loading="resumeLoading"
+            :rerun-loading="rerunLoading"
+            @pause="handlePause"
+            @resume="handleResume"
+            @rerun="(opts) => handleRerun(opts)"
+          />
+        </template>
         <UniEvalTqdmBar
           :percent="jobStatus!.progress"
           :detail="jobStatus!.progressDetail"
           :job-status="jobStatus!.status"
         />
         <p class="hint">任务 ID: {{ jobId }} · {{ jobStatus!.totalSamples }} 题 · {{ jobStatus!.model }}</p>
+        <p v-if="jobWorkers != null" class="hint">并发 workers：{{ jobWorkers }}</p>
+        <p v-if="jobStatus!.evalRounds && jobStatus!.evalRounds > 1" class="hint">
+          评测轮次：{{ jobStatus!.evalRounds }}
+        </p>
+        <JobTokenSummary :job="jobStatus" />
         <p v-if="jobStatus!.error" class="error-text">{{ jobStatus!.error }}</p>
       </a-card>
 
       <a-card v-if="overallAccuracy != null" title="总体结果" class="page-section" size="small">
+        <JobTokenSummary :job="jobStatus" />
         <a-row :gutter="16">
           <a-col :span="8">
             <a-statistic
@@ -225,6 +269,10 @@ import {
   createListenEvalJob,
   getListenEvalHealth,
   getListenEvalJob,
+  pauseListenEvalJob,
+  rerunListenEvalJob,
+  resumeListenEvalJob,
+  updateListenEvalJobDisplayName,
   type ListenEvalHealth,
   type ListenEvalJob,
   type ListenEvalPerRow,
@@ -234,6 +282,13 @@ import EvalRecentJobsCard, {
   type EvalRecentJobItem,
 } from '@/components/EvalRecentJobsCard.vue'
 import UniEvalTqdmBar from '@/components/UniEvalTqdmBar.vue'
+import JobInterruptedBanner from '@/components/eval/JobInterruptedBanner.vue'
+import JobApiErrorAlert from '@/components/eval/JobApiErrorAlert.vue'
+import JobTokenSummary from '@/components/eval/JobTokenSummary.vue'
+import JobDisplayNameEdit from '@/components/eval/JobDisplayNameEdit.vue'
+import JobProgressActions from '@/components/eval/JobProgressActions.vue'
+import { useEvalJobPoll } from '@/composables/useEvalJobPoll'
+import { useEvalJobControls } from '@/composables/useEvalJobControls'
 import { useLoginUserStore } from '@/stores/loginUser'
 
 const route = useRoute()
@@ -252,8 +307,15 @@ const selectedProviderPlatform = ref<string>('openrouter')
 const sampleMode = ref<'all' | 'random'>('random')
 const sampleCount = ref(5)
 const seed = ref<number | undefined>(undefined)
-const requestInterval = ref(1)
-const workers = ref(1)
+const requestInterval = ref(0)
+const workers = ref(4)
+const displayName = ref('')
+const evalRounds = ref(1)
+
+const { handlePollTerminal, handlePollCatch } = useEvalJobPoll({
+  completedMessage: '听力评测完成',
+  onRefreshRecent: () => recentCardRef.value?.loadRecentJobs(),
+})
 
 const jobLoading = ref(false)
 const jobId = ref('')
@@ -314,7 +376,29 @@ const showProgress = computed(
     jobStatus.value &&
     (jobStatus.value.status === 'running' ||
       jobStatus.value.status === 'pending' ||
+      jobStatus.value.status === 'paused' ||
+      jobStatus.value.status === 'interrupted' ||
       jobStatus.value.progressDetail),
+)
+
+const jobWorkers = computed(() => jobStatus.value?.workers ?? null)
+
+function getRuntimeOptions() {
+  return {
+    workers: workers.value,
+    requestInterval: requestInterval.value,
+  }
+}
+
+watch(
+  () => jobStatus.value?.jobId,
+  (id) => {
+    if (!id || !jobStatus.value) return
+    if (jobStatus.value.workers != null) workers.value = jobStatus.value.workers
+    if (jobStatus.value.requestInterval != null) {
+      requestInterval.value = jobStatus.value.requestInterval
+    }
+  },
 )
 
 const summaryOverall = computed(() => jobStatus.value?.summary?.overall)
@@ -485,14 +569,20 @@ async function pollJob(id: string) {
   try {
     const job = await getListenEvalJob(id)
     jobStatus.value = job
-    if (job.status === 'completed' || job.status === 'failed') {
+    if (
+      job.status === 'completed' ||
+      job.status === 'failed' ||
+      job.status === 'interrupted' ||
+      job.status === 'paused'
+    ) {
       stopPolling()
-      void recentCardRef.value?.loadRecentJobs()
-      if (job.status === 'completed') message.success('听力评测完成')
-      else message.error(job.error || '任务失败')
+      if (job.status !== 'paused') {
+        handlePollTerminal(job)
+      }
     }
-  } catch {
+  } catch (e: unknown) {
     stopPolling()
+    handlePollCatch(e)
   }
 }
 
@@ -512,9 +602,12 @@ async function runJob() {
       seed: seed.value,
       requestInterval: requestInterval.value,
       workers: workers.value,
+      displayName: displayName.value.trim() || undefined,
+      evalRounds: evalRounds.value,
     })
     jobId.value = id
     message.success('任务已创建')
+    void recentCardRef.value?.loadRecentJobs()
     startPolling(id)
     await scrollToJobDetail()
   } catch (e: unknown) {
@@ -523,6 +616,37 @@ async function runJob() {
     jobLoading.value = false
   }
 }
+
+async function saveJobDisplayName(name: string) {
+  if (!jobId.value) return
+  await updateListenEvalJobDisplayName(jobId.value, name)
+  if (jobStatus.value) {
+    jobStatus.value = { ...jobStatus.value, displayName: name }
+  }
+}
+
+function onDisplayNameSaved() {
+  void recentCardRef.value?.loadRecentJobs()
+}
+
+const {
+  pauseLoading,
+  rerunLoading,
+  resumeLoading,
+  handlePause,
+  handleRerun,
+  handleResume,
+} = useEvalJobControls({
+  jobId,
+  resumeJob: resumeListenEvalJob,
+  pauseJob: pauseListenEvalJob,
+  rerunJob: rerunListenEvalJob,
+  startPolling,
+  pollJob,
+  getRuntimeOptions,
+  onRefreshRecent: () => void recentCardRef.value?.loadRecentJobs(),
+  resumePausedMessage: '已开始续跑（跳过已完成题目）',
+})
 
 async function loadJob(id: string) {
   if (!requireLogin()) return

@@ -33,6 +33,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { useLoginUserStore } from '@/stores/loginUser'
+import { useEvalRecentJobsPoll } from '@/composables/useEvalRecentJobsPoll'
 import { listContentEvalJobs, type ContentEvalJob } from '@/api/contentEvalController'
 import {
   listOralCombinedJobs,
@@ -87,19 +88,39 @@ function formatJobId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id
 }
 
+function jobTitle(displayName?: string, jobId?: string) {
+  const name = displayName?.trim()
+  if (name) return name
+  return formatJobId(jobId || '')
+}
+
 function formatUniDescription(item: UnifiedEvalJob) {
   const parts: string[] = []
   if (item.jobType === 'multi_model' && item.modelCount) {
     parts.push(`${item.modelCount} 模型`)
   }
   parts.push(`${item.totalFiles} 文件`)
-  parts.push(item.status)
+  parts.push(statusLabel(item.status))
+  if (item.status === 'interrupted') {
+    const total = item.totalCount ?? item.totalFiles
+    const done = item.completedCount ?? 0
+    if (total) parts.push(`${done}/${total}`)
+  }
   if (item.createdAt) parts.push(item.createdAt)
   return parts.join(' · ')
 }
 
 function formatContentDescription(item: ContentEvalJob) {
-  const parts = [`${item.totalFiles} 文件`, item.status]
+  const parts: string[] = []
+  if (item.jobType === 'multi_model' && item.modelCount) {
+    parts.push(`${item.modelCount} 模型`)
+  }
+  parts.push(`${item.totalFiles} 文件`, statusLabel(item.status))
+  if (item.status === 'interrupted') {
+    const total = item.totalCount ?? item.totalFiles
+    const done = item.completedCount ?? 0
+    if (total) parts.push(`${done}/${total}`)
+  }
   if (item.createdAt) parts.push(item.createdAt)
   return parts.join(' · ')
 }
@@ -107,7 +128,12 @@ function formatContentDescription(item: ContentEvalJob) {
 function formatCombinedDescription(item: OralCombinedJob) {
   const parts: string[] = []
   if (item.pipelineMode) parts.push('一站式')
-  parts.push(`${item.totalFiles} 组成对`, item.status)
+  parts.push(`${item.totalFiles} 组成对`, statusLabel(item.status))
+  if (item.status === 'interrupted') {
+    const total = item.totalCount ?? item.totalFiles
+    const done = item.completedCount ?? 0
+    if (total) parts.push(`${done}/${total}`)
+  }
   if (item.summary?.okCount != null) {
     parts.push(`成功 ${item.summary.okCount}`)
   }
@@ -116,7 +142,12 @@ function formatCombinedDescription(item: OralCombinedJob) {
 }
 
 function formatOralGenDescription(item: OralGenJob) {
-  const parts = [`${item.totalSamples} 条`, item.status]
+  const parts = [`${item.totalSamples} 条`, statusLabel(item.status)]
+  if (item.status === 'interrupted') {
+    const total = item.totalCount ?? item.totalSamples
+    const done = item.completedCount ?? 0
+    if (total) parts.push(`${done}/${total}`)
+  }
   if (item.summary?.success != null) {
     parts.push(`成功 ${item.summary.success}`)
   }
@@ -125,7 +156,12 @@ function formatOralGenDescription(item: OralGenJob) {
 }
 
 function formatListenDescription(item: ListenEvalJob) {
-  const parts = [`${item.totalSamples} 题`, item.status]
+  const parts = [`${item.totalSamples} 题`, statusLabel(item.status)]
+  if (item.status === 'interrupted') {
+    const total = item.totalCount ?? item.totalSamples
+    const done = item.completedCount ?? 0
+    if (total) parts.push(`${done}/${total}`)
+  }
   if (item.summary?.overall?.accuracy != null) {
     parts.push(`准确率 ${(item.summary.overall.accuracy * 100).toFixed(1)}%`)
   }
@@ -155,7 +191,10 @@ function kindTagColor(kind: EvalRecentKind) {
 function statusColor(status: string) {
   if (status === 'completed') return 'green'
   if (status === 'failed') return 'red'
-  if (status === 'running') return 'processing'
+  if (status === 'running' || status === 'generating') return 'processing'
+  if (status === 'interrupted') return 'warning'
+  if (status === 'paused') return 'cyan'
+  if (status === 'awaiting_eval') return 'gold'
   return 'default'
 }
 
@@ -165,6 +204,10 @@ function statusLabel(status: string) {
     failed: '失败',
     running: '进行中',
     pending: '排队',
+    generating: '生成中',
+    awaiting_eval: '待评测',
+    interrupted: '已中断',
+    paused: '已暂停',
   }
   return map[status] || status
 }
@@ -190,7 +233,7 @@ async function loadRecentJobs() {
     const oralGen: EvalRecentJobItem[] = (oralGenData.jobs || []).map((item) => ({
       kind: 'oral_gen' as const,
       jobId: item.jobId,
-      title: formatJobId(item.jobId),
+      title: jobTitle(item.displayName, item.jobId),
       description: formatOralGenDescription(item),
       status: item.status,
       createdAt: item.createdAt || '',
@@ -199,7 +242,7 @@ async function loadRecentJobs() {
     const speech: EvalRecentJobItem[] = (uniData.jobs || []).map((item) => ({
       kind: 'speech' as const,
       jobId: item.jobId,
-      title: formatJobId(item.jobId),
+      title: jobTitle(item.displayName, item.jobId),
       description: formatUniDescription(item),
       status: item.status,
       createdAt: item.createdAt || '',
@@ -208,7 +251,7 @@ async function loadRecentJobs() {
     const content: EvalRecentJobItem[] = (contentData.jobs || []).map((item) => ({
       kind: 'content' as const,
       jobId: item.jobId,
-      title: formatJobId(item.jobId),
+      title: jobTitle(item.displayName, item.jobId),
       description: formatContentDescription(item),
       status: item.status,
       createdAt: item.createdAt || '',
@@ -217,7 +260,7 @@ async function loadRecentJobs() {
     const combined: EvalRecentJobItem[] = (combinedData.jobs || []).map((item) => ({
       kind: 'combined' as const,
       jobId: item.jobId,
-      title: formatJobId(item.jobId),
+      title: jobTitle(item.displayName, item.jobId),
       description: formatCombinedDescription(item),
       status: item.status,
       createdAt: item.createdAt || '',
@@ -226,7 +269,7 @@ async function loadRecentJobs() {
     const listening: EvalRecentJobItem[] = (listenData.jobs || []).map((item) => ({
       kind: 'listening' as const,
       jobId: item.jobId,
-      title: formatJobId(item.jobId),
+      title: jobTitle(item.displayName, item.jobId),
       description: formatListenDescription(item),
       status: item.status,
       createdAt: item.createdAt || '',
@@ -253,6 +296,8 @@ watch(
 onMounted(() => {
   void loadRecentJobs()
 })
+
+useEvalRecentJobsPoll(recentJobs, loadRecentJobs)
 
 defineExpose({ loadRecentJobs })
 </script>

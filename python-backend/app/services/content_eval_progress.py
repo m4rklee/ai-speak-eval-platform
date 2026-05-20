@@ -42,20 +42,23 @@ def progress_detail_vo(detail: Optional[dict[str, Any]]) -> Optional[dict[str, A
         "ratePerSec": detail.get("rate_per_sec", detail.get("ratePerSec")),
         "message": detail.get("message", ""),
         "tqdmLine": detail.get("tqdm_line", detail.get("tqdmLine", "")),
+        "warningLine": detail.get("warning_line", detail.get("warningLine")),
     }
 
 
 class ContentEvalProgressReporter:
-    def __init__(self, job_id: str, total_files: int) -> None:
+    def __init__(self, job_id: str, total_files: int, *, offset: int = 0) -> None:
         self.job_id = job_id
         self.total_files = max(1, total_files)
+        self.offset = max(0, offset)
         self.started_at = time.time()
-        self.current = 0
+        self.current = offset
         self.message = ""
 
     def _build_detail(self) -> dict[str, Any]:
         elapsed = time.time() - self.started_at
-        rate = self.current / elapsed if elapsed > 0 and self.current > 0 else 0
+        done = self.current - self.offset
+        rate = done / elapsed if elapsed > 0 and done > 0 else 0
         remaining = self.total_files - self.current
         eta = remaining / rate if rate > 0 else remaining * SEC_PER_FILE
         pct = int(min(99, (self.current / self.total_files) * 100)) if self.current < self.total_files else 100

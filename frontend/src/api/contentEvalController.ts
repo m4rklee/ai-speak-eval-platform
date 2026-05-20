@@ -1,4 +1,7 @@
 import request from '@/request'
+import type { ModelEvalSlot } from '@/api/unifiedEvalController'
+import type { EvalJobCommonFields, EvalJobCreateMeta } from '@/types/evalJobCommon'
+import { appendCreateMeta, updateEvalJobDisplayName, pauseEvalJob, rerunEvalJob } from '@/api/evalJobApiHelpers'
 
 type BaseResponse<T = unknown> = {
   code: number
@@ -54,19 +57,43 @@ export type ContentEvalJobSummary = {
   dimensions?: Array<{ dimNameCn: string; dimNameEn: string; score: number }>
 }
 
+export type ContentEvalModelComparison = {
+  modelName: string
+  fileCount?: number
+  grammarMean?: number
+  themeFocusMean?: number
+  answerClarityMean?: number
+  compositeMean?: number
+}
+
+export type ContentEvalModelResult = {
+  modelName: string
+  summary?: ContentEvalJobSummary
+  perFile?: Array<Record<string, unknown>>
+}
+
 export type ContentEvalJob = {
   jobId: string
+  jobType?: 'single' | 'multi_model'
   status: string
   progress: number
   totalFiles: number
+  modelCount?: number
   error?: string
   progressDetail?: ContentEvalProgressDetail
   summary?: ContentEvalJobSummary
   perFile?: Array<Record<string, unknown>>
+  models?: ContentEvalModelResult[]
+  comparison?: { byModel?: ContentEvalModelComparison[] }
   result?: Record<string, unknown>
   createdAt?: string
   finishedAt?: string
-}
+  completedCount?: number
+  totalCount?: number
+  canResume?: boolean
+  interruptedAt?: string
+  hasCheckpoint?: boolean
+} & EvalJobCommonFields
 
 function unwrap<T>(res: { data: BaseResponse<T> }): T {
   const body = res.data
@@ -111,7 +138,11 @@ export async function evaluateContentSingle(params: {
   return unwrap(res)
 }
 
-export async function createContentEvalJob(files: File[], archive?: File) {
+export async function createContentEvalJob(
+  files: File[],
+  archive?: File,
+  meta?: EvalJobCreateMeta,
+) {
   const form = new FormData()
   for (const f of files) {
     form.append('files', f)
@@ -119,8 +150,32 @@ export async function createContentEvalJob(files: File[], archive?: File) {
   if (archive) {
     form.append('archive', archive)
   }
+  appendCreateMeta(form, meta)
   const res = await request.post<BaseResponse<string>>('/content-eval/jobs', form, {
     timeout: 120000,
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return unwrap(res)
+}
+
+export async function createContentMultiModelJob(slots: ModelEvalSlot[], meta?: EvalJobCreateMeta) {
+  const form = new FormData()
+  for (const slot of slots) {
+    form.append('modelNames', slot.modelName.trim())
+  }
+  slots.forEach((slot, idx) => {
+    if (slot.zipFile) {
+      form.append(`archive_${idx}`, slot.zipFile)
+    } else {
+      const allFiles = slot.files.length ? slot.files : slot.dirFiles
+      for (const f of allFiles) {
+        form.append(`files_${idx}`, f)
+      }
+    }
+  })
+  appendCreateMeta(form, meta)
+  const res = await request.post<BaseResponse<string>>('/content-eval/multi-model-jobs', form, {
+    timeout: 300000,
     headers: { 'Content-Type': 'multipart/form-data' },
   })
   return unwrap(res)
@@ -134,4 +189,21 @@ export async function getContentEvalJob(jobId: string) {
 export async function listContentEvalJobs() {
   const res = await request.get<BaseResponse<{ jobs: ContentEvalJob[] }>>('/content-eval/jobs')
   return unwrap(res)
+}
+
+export async function resumeContentEvalJob(jobId: string) {
+  const res = await request.post<BaseResponse<null>>(`/content-eval/jobs/${jobId}/resume`)
+  return unwrap(res)
+}
+
+export async function updateContentEvalJobDisplayName(jobId: string, displayName: string) {
+  return updateEvalJobDisplayName('content-eval', jobId, displayName)
+}
+
+export async function pauseContentEvalJob(jobId: string) {
+  return pauseEvalJob('content-eval', jobId)
+}
+
+export async function rerunContentEvalJob(jobId: string) {
+  return rerunEvalJob('content-eval', jobId)
 }

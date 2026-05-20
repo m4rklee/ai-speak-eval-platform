@@ -50,6 +50,11 @@ async def lifespan(app: FastAPI):
                 )
 
         asyncio.create_task(_log_daemon_status())
+    from app.services.job_resume import mark_stale_jobs
+
+    marked = await mark_stale_jobs()
+    if marked:
+        logger.info("已将 %d 个中断任务标记为 interrupted", marked)
     logger.info("=" * 50)
     yield
     # shutdown

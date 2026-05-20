@@ -59,6 +59,7 @@ import { PAGE_ICON_META, type PageIconKey } from '@/constants/pageIcons'
 const MENU_ICON_KEYS: Record<string, PageIconKey> = {
   '/oral-eval': 'oral-eval',
   '/listen-eval': 'listen-eval',
+  '/eval-reports': 'eval-reports',
   '/models': 'models',
   '/side-by-side': 'side-by-side',
   '/prompt-lab': 'prompt-lab',
@@ -80,6 +81,7 @@ const route = useRoute()
 const NAV_PATHS = [
   '/oral-eval',
   '/listen-eval',
+  '/eval-reports',
   '/models',
   '/side-by-side',
   '/prompt-lab',
@@ -105,6 +107,7 @@ selectedKeys.value = [resolveSelectedKey(route.path)]
 const MENU_LABELS: Record<string, string> = {
   '/oral-eval': '口语评测',
   '/listen-eval': '听力评测',
+  '/eval-reports': '评测报告',
   '/models': '模型库',
   '/side-by-side': '模型对比',
   '/prompt-lab': 'Prompt Lab',

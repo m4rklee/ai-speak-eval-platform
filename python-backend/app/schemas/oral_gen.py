@@ -27,6 +27,8 @@ class OralGenJobCreateVO(BaseModel):
     sample_count: int = Field(default=0, alias="sampleCount")
     seed: Optional[int] = None
     request_interval: Optional[float] = Field(default=None, alias="requestInterval")
+    display_name: Optional[str] = Field(default=None, alias="displayName")
+    eval_rounds: Optional[int] = Field(default=None, alias="evalRounds", ge=1, le=5)
 
     model_config = {"populate_by_name": True}
 
@@ -43,6 +45,7 @@ class OralGenProgressDetailVO(BaseModel):
     rate_per_sec: Optional[float] = Field(default=None, alias="ratePerSec")
     message: str = ""
     tqdm_line: str = Field(default="", alias="tqdmLine")
+    warning_line: Optional[str] = Field(default=None, alias="warningLine")
 
     model_config = {"populate_by_name": True}
 
@@ -62,6 +65,9 @@ class OralGenJobSummaryVO(BaseModel):
     total: int = 0
     success: int = 0
     failed: int = 0
+    total_input_tokens: int = Field(default=0, alias="totalInputTokens")
+    total_output_tokens: int = Field(default=0, alias="totalOutputTokens")
+    estimated_cost_usd: Optional[float] = Field(default=None, alias="estimatedCostUsd")
 
     model_config = {"populate_by_name": True}
 
@@ -82,6 +88,22 @@ class OralGenJobVO(BaseModel):
     progress_detail: Optional[OralGenProgressDetailVO] = Field(
         default=None, alias="progressDetail"
     )
+    completed_count: Optional[int] = Field(default=None, alias="completedCount")
+    total_count: Optional[int] = Field(default=None, alias="totalCount")
+    can_resume: Optional[bool] = Field(default=None, alias="canResume")
+    interrupted_at: Optional[str] = Field(default=None, alias="interruptedAt")
+    paused_at: Optional[str] = Field(default=None, alias="pausedAt")
+    can_pause: Optional[bool] = Field(default=None, alias="canPause")
+    can_rerun: Optional[bool] = Field(default=None, alias="canRerun")
+    has_checkpoint: Optional[bool] = Field(default=None, alias="hasCheckpoint")
+    display_name: Optional[str] = Field(default=None, alias="displayName")
+    eval_rounds: Optional[int] = Field(default=None, alias="evalRounds")
+    api_error_count: int = Field(default=0, alias="apiErrorCount")
+    last_api_error: Optional[str] = Field(default=None, alias="lastApiError")
+    last_api_error_at: Optional[str] = Field(default=None, alias="lastApiErrorAt")
+    total_input_tokens: int = Field(default=0, alias="totalInputTokens")
+    total_output_tokens: int = Field(default=0, alias="totalOutputTokens")
+    estimated_cost_usd: Optional[float] = Field(default=None, alias="estimatedCostUsd")
 
     model_config = {"populate_by_name": True}
 

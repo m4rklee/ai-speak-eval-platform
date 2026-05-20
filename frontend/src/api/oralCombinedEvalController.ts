@@ -1,4 +1,6 @@
 import request from '@/request'
+import type { EvalJobCommonFields, EvalJobCreateMeta } from '@/types/evalJobCommon'
+import { appendCreateMeta, updateEvalJobDisplayName, pauseEvalJob, rerunEvalJob } from '@/api/evalJobApiHelpers'
 
 type BaseResponse<T = unknown> = {
   code: number
@@ -119,7 +121,12 @@ export type OralCombinedJob = {
   genRows?: OralCombinedGenRow[]
   genSummary?: OralCombinedGenSummary
   autoStartEval?: boolean
-}
+  completedCount?: number
+  totalCount?: number
+  canResume?: boolean
+  interruptedAt?: string
+  hasCheckpoint?: boolean
+} & EvalJobCommonFields
 
 export type OralCombinedPipelineCreate = {
   model: string
@@ -129,7 +136,7 @@ export type OralCombinedPipelineCreate = {
   seed?: number
   requestInterval?: number
   autoStartEval: boolean
-}
+} & EvalJobCreateMeta
 
 function unwrap<T>(res: { data: BaseResponse<T> }): T {
   const body = res.data
@@ -144,7 +151,11 @@ export async function getOralCombinedHealth() {
   return unwrap(res)
 }
 
-export async function createOralCombinedJob(files: File[], archive?: File) {
+export async function createOralCombinedJob(
+  files: File[],
+  archive?: File,
+  meta?: EvalJobCreateMeta,
+) {
   const form = new FormData()
   for (const f of files) {
     form.append('files', f)
@@ -152,6 +163,7 @@ export async function createOralCombinedJob(files: File[], archive?: File) {
   if (archive) {
     form.append('archive', archive)
   }
+  appendCreateMeta(form, meta)
   const res = await request.post<BaseResponse<string>>('/oral-combined/jobs', form, {
     timeout: 120000,
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -169,6 +181,7 @@ export async function createOralCombinedPipelineUpload(
   files: File[],
   autoStartEval: boolean,
   requestInterval?: number,
+  meta?: EvalJobCreateMeta,
 ) {
   const form = new FormData()
   form.append('model', model)
@@ -176,6 +189,7 @@ export async function createOralCombinedPipelineUpload(
   if (requestInterval != null) {
     form.append('request_interval', String(requestInterval))
   }
+  appendCreateMeta(form, meta)
   for (const f of files) {
     form.append('files', f)
   }
@@ -208,6 +222,13 @@ export async function continueOralCombinedJob(jobId: string) {
   return unwrap(res)
 }
 
+export async function resumeOralCombinedJob(jobId: string) {
+  const res = await request.post<BaseResponse<null>>(
+    `/oral-combined/jobs/${encodeURIComponent(jobId)}/resume`,
+  )
+  return unwrap(res)
+}
+
 export async function getOralCombinedJob(jobId: string) {
   const res = await request.get<BaseResponse<OralCombinedJob>>(`/oral-combined/jobs/${jobId}`)
   return unwrap(res)
@@ -216,6 +237,18 @@ export async function getOralCombinedJob(jobId: string) {
 export async function listOralCombinedJobs() {
   const res = await request.get<BaseResponse<{ jobs: OralCombinedJob[] }>>('/oral-combined/jobs')
   return unwrap(res)
+}
+
+export async function updateOralCombinedJobDisplayName(jobId: string, displayName: string) {
+  return updateEvalJobDisplayName('oral-combined', jobId, displayName)
+}
+
+export async function pauseOralCombinedJob(jobId: string) {
+  return pauseEvalJob('oral-combined', jobId)
+}
+
+export async function rerunOralCombinedJob(jobId: string) {
+  return rerunEvalJob('oral-combined', jobId)
 }
 
 export function getOralCombinedAudioUrl(jobId: string, wavname: string) {

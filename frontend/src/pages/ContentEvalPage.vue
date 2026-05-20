@@ -18,12 +18,38 @@
           {{ health.questionDirMessage }}
         </span>
       </a-space>
+      <a-alert
+        v-if="health && !health.questionDirOk"
+        type="warning"
+        show-icon
+        style="margin-top: 12px"
+        message="题库未就绪"
+        :description="health.questionDirMessage || '请配置 content_eval 题库目录后刷新状态'"
+      />
       <a-button size="small" style="margin-top: 8px" :loading="healthLoading" @click="loadHealth">
         刷新状态
       </a-button>
     </a-card>
 
     <a-card class="section">
+      <a-form layout="inline" class="batch-meta-form">
+        <a-form-item label="任务名称（可选）">
+          <a-input v-model:value="displayName" placeholder="留空则自动生成" :maxlength="64" style="width: 200px" />
+        </a-form-item>
+        <a-form-item label="评测轮次">
+          <a-input-number v-model:value="evalRounds" :min="1" :max="5" style="width: 80px" />
+        </a-form-item>
+        <a-form-item label="Judge 模型">
+          <a-select
+            v-model:value="judgeModel"
+            show-search
+            placeholder="选择文本模型"
+            :loading="judgeModelsLoading"
+            :options="judgeModelOptions"
+            style="width: 280px"
+          />
+        </a-form-item>
+      </a-form>
       <a-tabs v-model:activeKey="activeTab">
         <a-tab-pane key="single" tab="单条评测">
           <a-form layout="vertical">
@@ -79,66 +105,84 @@
           <p v-if="!loginUserStore.loginUser?.id" class="hint">请先登录后再提交评测</p>
         </a-tab-pane>
 
-        <a-tab-pane key="batch" tab="批量评测">
-          <a-tabs v-model:activeKey="batchMode" size="small">
-            <a-tab-pane key="multi" tab="多文件">
-              <a-upload
-                :multiple="true"
-                :file-list="multiFileList"
-                accept=".txt,text/plain"
-                :before-upload="onMultiBeforeUpload"
-                @remove="onMultiRemove"
-              >
-                <a-button>
-                  <UploadOutlined />
-                  选择多个 .txt
-                </a-button>
-              </a-upload>
-            </a-tab-pane>
-            <a-tab-pane key="dir" tab="目录 / ZIP">
-              <a-space direction="vertical" style="width: 100%">
-                <div>
-                  <input
-                    ref="dirInputRef"
-                    type="file"
-                    webkitdirectory
-                    directory
-                    multiple
-                    accept=".txt,text/plain"
-                    style="display: none"
-                    @change="onDirChange"
-                  />
-                  <a-button @click="pickDirectory">
-                    <FolderOpenOutlined />
-                    选择文件夹（含 txt）
-                  </a-button>
-                  <span v-if="dirFiles.length" class="hint">已选 {{ dirFiles.length }} 个 txt</span>
-                </div>
-                <a-upload
-                  :multiple="false"
-                  :show-upload-list="!!zipFile"
-                  accept=".zip"
-                  :before-upload="onZipBeforeUpload"
-                  @remove="zipFile = null"
-                >
-                  <a-button>
-                    <FileZipOutlined />
-                    或上传 zip 包
-                  </a-button>
-                </a-upload>
-              </a-space>
-            </a-tab-pane>
-          </a-tabs>
+        <a-tab-pane key="multi" tab="多文件">
+          <a-upload
+            :multiple="true"
+            :file-list="multiFileList"
+            :accept="batchUpload.acceptMime"
+            :before-upload="batchUpload.onMultiBeforeUpload"
+            @remove="batchUpload.onMultiRemove"
+          >
+            <a-button>
+              <UploadOutlined />
+              选择多个 .txt
+            </a-button>
+          </a-upload>
           <a-button
             type="primary"
             class="action-btn"
             :loading="jobLoading"
-            :disabled="!batchReady"
-            @click="runBatch"
+            :disabled="!canSubmitBatch('multi')"
+            @click="runBatch('multi')"
           >
-            提交批量任务
+            提交批量任务（{{ multiFiles.length }} 个文件）
           </a-button>
           <p class="hint">answer 文件名按 stem 匹配内置题目（如 00174_环境安静_女.txt → 00174）</p>
+        </a-tab-pane>
+
+        <a-tab-pane key="dir" tab="目录 / ZIP">
+          <a-space direction="vertical" style="width: 100%">
+            <div>
+              <input
+                :ref="(el) => { dirInputRef = el as HTMLInputElement | null }"
+                type="file"
+                webkitdirectory
+                directory
+                multiple
+                :accept="batchUpload.acceptMime"
+                style="display: none"
+                @change="batchUpload.onDirChange"
+              />
+              <a-button @click="batchUpload.pickDirectory">
+                <FolderOpenOutlined />
+                选择文件夹（含 txt）
+              </a-button>
+              <span v-if="dirFiles.length" class="hint">{{ dirSelectionHint }}</span>
+            </div>
+            <a-upload
+              :multiple="false"
+              :show-upload-list="!!zipFile"
+              accept=".zip"
+              :before-upload="batchUpload.onZipBeforeUpload"
+              @remove="zipFile = null"
+            >
+              <a-button>
+                <FileZipOutlined />
+                或上传 zip 包
+              </a-button>
+            </a-upload>
+            <a-button
+              type="primary"
+              :loading="jobLoading"
+              :disabled="!canSubmitBatch('dir')"
+              @click="runBatch('dir')"
+            >
+              提交任务
+            </a-button>
+          </a-space>
+          <p class="hint">answer 文件名按 stem 匹配内置题目</p>
+        </a-tab-pane>
+
+        <a-tab-pane key="multiModel" tab="多模型对比">
+          <EvalMultiModelSlots
+            accept-ext="txt"
+            file-label="txt"
+            :max-models="maxModelsPerJob"
+            :loading="multiModelLoading"
+            :submit-disabled="!health?.questionDirOk"
+            :show-login-hint="!loginUserStore.loginUser?.id"
+            @submit="runMultiModelBatch"
+          />
         </a-tab-pane>
       </a-tabs>
     </a-card>
@@ -181,84 +225,145 @@
       </a-collapse>
     </a-card>
 
-    <div v-if="jobId && jobStatus" ref="jobDetailRef" class="job-detail-section">
-      <a-card v-if="showProgress" title="评测进度" class="section" size="small">
-        <UniEvalTqdmBar
-          :percent="jobStatus!.progress"
-          :detail="jobStatus!.progressDetail"
-          :job-status="jobStatus!.status"
+    <JobInterruptedBanner
+      v-if="jobId && jobStatus"
+      :job="jobStatus"
+      :loading="resumeLoading"
+      @resume="handleResume"
+    />
+    <JobApiErrorAlert v-if="jobId && jobStatus" :job="jobStatus" />
+    <JobDisplayNameEdit
+      v-if="jobId && jobStatus"
+      :job-id="jobId"
+      :display-name="jobStatus.displayName"
+      :on-save="saveJobDisplayName"
+      @saved="onDisplayNameSaved"
+    />
+    <a-card v-if="showProgress" title="评测进度" class="section" size="small">
+      <template #extra>
+        <JobProgressActions
+          :job="jobStatus"
+          :pause-loading="pauseLoading"
+          :resume-loading="resumeLoading"
+          :rerun-loading="rerunLoading"
+          @pause="handlePause"
+          @resume="handleResume"
+          @rerun="handleRerun"
         />
-        <p class="hint">任务 ID: {{ jobId }} · {{ jobStatus!.totalFiles }} 个文件</p>
-        <p v-if="jobStatus!.error" class="error-text">{{ jobStatus!.error }}</p>
-      </a-card>
+      </template>
+      <UniEvalTqdmBar
+        :percent="jobStatus!.progress"
+        :detail="jobStatus!.progressDetail"
+        :job-status="jobStatus!.status"
+      />
+      <p class="hint">
+        任务 ID: {{ jobId }}
+        <span v-if="isMultiModelJob"> · {{ jobStatus!.modelCount }} 模型</span>
+        · {{ jobStatus!.totalFiles }} 个文件
+        <span v-if="jobStatus!.judgeModel"> · Judge: {{ jobStatus!.judgeModel }}</span>
+        <span v-if="jobStatus!.evalRounds && jobStatus!.evalRounds > 1">
+          · 轮次 {{ jobStatus!.evalRounds }}
+        </span>
+      </p>
+      <JobTokenSummary :job="jobStatus" />
+      <p v-if="jobStatus!.error" class="error-text">{{ jobStatus!.error }}</p>
+    </a-card>
 
-      <a-card v-if="displaySummary" title="批量汇总" class="section" size="small">
-        <a-descriptions bordered size="small" :column="3">
-          <a-descriptions-item label="文件数">{{ displaySummary.fileCount ?? '—' }}</a-descriptions-item>
-          <a-descriptions-item label="成功数">{{ displaySummary.okCount ?? '—' }}</a-descriptions-item>
-          <a-descriptions-item label="语法均值">{{ formatScore(displaySummary.grammarMean) }}</a-descriptions-item>
-          <a-descriptions-item label="主题均值">{{ formatScore(displaySummary.themeFocusMean) }}</a-descriptions-item>
-          <a-descriptions-item label="简洁均值">{{ formatScore(displaySummary.answerClarityMean) }}</a-descriptions-item>
-          <a-descriptions-item label="综合均值">{{ formatScore(displaySummary.compositeMean) }}</a-descriptions-item>
-        </a-descriptions>
-      </a-card>
-
-      <a-card v-if="tableRows.length" title="评测结果" class="section">
-        <template #extra>
-          <a-space>
-            <a-button size="small" @click="exportBatchJson">导出 JSON</a-button>
-            <a-button size="small" @click="exportBatchCsv">导出 CSV</a-button>
-          </a-space>
-        </template>
-        <p class="hint" style="margin-bottom: 8px">点击行首展开图标，或「详情」查看题目与回答全文</p>
-        <a-table
-          :columns="columns"
-          :data-source="tableRows"
-          :pagination="{ pageSize: 20 }"
-          row-key="rowKey"
-          size="small"
-          :scroll="{ x: 1000 }"
-          :expanded-row-keys="expandedRowKeys"
-          @expand="onTableExpand"
-        >
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.dataIndex === 'action'">
-              <a @click="toggleRowExpand(record.rowKey)">详情</a>
-            </template>
-          </template>
-          <template #expandedRowRender="{ record }">
-            <div class="row-detail">
-              <div class="detail-block">
-                <div class="detail-label">题目（{{ record.questionId || '—' }}）</div>
-                <div class="text-block">{{ record.question || '—' }}</div>
-              </div>
-              <div class="detail-block">
-                <div class="detail-label">回答</div>
-                <div class="text-block">{{ record.answer || '—' }}</div>
-              </div>
-              <div v-if="record.reason" class="detail-block">
-                <div class="detail-label">评分理由</div>
-                <div class="text-block muted">{{ record.reason }}</div>
-              </div>
-              <a-collapse v-if="record.dimensions && Object.keys(record.dimensions).length" ghost>
-                <a-collapse-panel key="json" header="维度详情 JSON">
-                  <pre class="json-block">{{ JSON.stringify(record.dimensions, null, 2) }}</pre>
-                </a-collapse-panel>
-              </a-collapse>
-            </div>
-          </template>
-        </a-table>
-      </a-card>
-
-      <a-card
-        v-else-if="jobStatus.status === 'completed' || jobStatus.status === 'failed'"
-        title="评测结果"
-        class="section"
+    <a-card v-if="compareRows.length" title="模型对比汇总" class="section" size="small">
+      <JobTokenSummary :job="jobStatus" />
+      <a-space style="margin-bottom: 12px">
+        <a-button size="small" @click="exportBatchJson">导出 JSON</a-button>
+        <a-button size="small" @click="exportBatchCsv">导出 CSV</a-button>
+      </a-space>
+      <a-table
+        :columns="compareColumns"
+        :data-source="compareRows"
+        :pagination="false"
+        row-key="modelName"
         size="small"
+        :scroll="{ x: 900 }"
+      />
+    </a-card>
+
+    <a-card v-if="displaySummary && !isMultiModelJob" title="批量汇总" class="section" size="small">
+      <JobTokenSummary :job="jobStatus" />
+      <a-descriptions bordered size="small" :column="3">
+        <a-descriptions-item label="文件数">{{ displaySummary.fileCount ?? '—' }}</a-descriptions-item>
+        <a-descriptions-item label="成功数">{{ displaySummary.okCount ?? '—' }}</a-descriptions-item>
+        <a-descriptions-item label="语法均值">{{ formatScore(displaySummary.grammarMean) }}</a-descriptions-item>
+        <a-descriptions-item label="主题均值">{{ formatScore(displaySummary.themeFocusMean) }}</a-descriptions-item>
+        <a-descriptions-item label="简洁均值">{{ formatScore(displaySummary.answerClarityMean) }}</a-descriptions-item>
+        <a-descriptions-item label="综合均值">{{ formatScore(displaySummary.compositeMean) }}</a-descriptions-item>
+      </a-descriptions>
+    </a-card>
+
+    <a-card v-if="tableRows.length" :title="isMultiModelJob ? '逐文件明细' : '评测结果'" class="section">
+      <template v-if="!isMultiModelJob" #extra>
+        <a-space>
+          <a-button size="small" @click="exportBatchJson">导出 JSON</a-button>
+          <a-button size="small" @click="exportBatchCsv">导出 CSV</a-button>
+        </a-space>
+      </template>
+      <a-space v-if="isMultiModelJob && modelFilterOptions.length" style="margin-bottom: 12px">
+        <span>筛选模型：</span>
+        <a-select
+          v-model:value="detailModelFilter"
+          style="width: 220px"
+          :options="modelFilterOptions"
+          allow-clear
+          placeholder="全部模型"
+        />
+      </a-space>
+      <p v-if="!isMultiModelJob" class="hint" style="margin-bottom: 8px">
+        点击行首展开图标，或「详情」查看题目与回答全文
+      </p>
+      <a-table
+        :columns="detailColumns"
+        :data-source="filteredTableRows"
+        :pagination="{ pageSize: 20 }"
+        row-key="rowKey"
+        size="small"
+        :scroll="{ x: 1100 }"
+        :expanded-row-keys="expandedRowKeys"
+        @expand="onTableExpand"
       >
-        <a-empty description="该任务无明细结果（可能已过期，请重新提交评测）" />
-      </a-card>
-    </div>
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.dataIndex === 'action'">
+            <a @click="toggleRowExpand(record.rowKey)">详情</a>
+          </template>
+        </template>
+        <template #expandedRowRender="{ record }">
+          <div class="row-detail">
+            <div class="detail-block">
+              <div class="detail-label">题目（{{ record.questionId || '—' }}）</div>
+              <div class="text-block">{{ record.question || '—' }}</div>
+            </div>
+            <div class="detail-block">
+              <div class="detail-label">回答</div>
+              <div class="text-block">{{ record.answer || '—' }}</div>
+            </div>
+            <div v-if="record.reason" class="detail-block">
+              <div class="detail-label">评分理由</div>
+              <div class="text-block muted">{{ record.reason }}</div>
+            </div>
+            <a-collapse v-if="record.dimensions && Object.keys(record.dimensions).length" ghost>
+              <a-collapse-panel key="json" header="维度详情 JSON">
+                <pre class="json-block">{{ JSON.stringify(record.dimensions, null, 2) }}</pre>
+              </a-collapse-panel>
+            </a-collapse>
+          </div>
+        </template>
+      </a-table>
+    </a-card>
+
+    <a-card
+      v-else-if="jobStatus && (jobStatus.status === 'completed' || jobStatus.status === 'failed')"
+      title="评测结果"
+      class="section"
+      size="small"
+    >
+      <a-empty description="该任务无明细结果（可能已过期，请重新提交评测）" />
+    </a-card>
 
     <a-card v-if="!embedded && recentJobs.length" title="最近任务" class="section" size="small">
       <template #extra>
@@ -273,7 +378,7 @@
             <a-list-item-meta>
               <template #title>
                 <a-space :size="8">
-                  <span class="job-id-text" :title="item.jobId">{{ formatJobId(item.jobId) }}</span>
+                  <span class="job-id-text" :title="item.jobId">{{ jobTitle(item) }}</span>
                   <a-tag :color="statusColor(item.status)" class="job-status-tag">
                     {{ statusLabel(item.status) }}
                   </a-tag>
@@ -302,20 +407,22 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import type { UploadProps } from 'ant-design-vue'
-import {
-  FileZipOutlined,
-  FolderOpenOutlined,
-  UploadOutlined,
-} from '@ant-design/icons-vue'
+import { FileZipOutlined, FolderOpenOutlined, UploadOutlined } from '@ant-design/icons-vue'
 import { useLoginUserStore } from '@/stores/loginUser'
+import type { ModelEvalSlot } from '@/api/unifiedEvalController'
 import {
   createContentEvalJob,
+  createContentMultiModelJob,
   evaluateContentSingle,
   getContentEvalHealth,
   getContentEvalJob,
+  pauseContentEvalJob,
+  rerunContentEvalJob,
+  resumeContentEvalJob,
+  updateContentEvalJobDisplayName,
   getContentEvalQuestion,
   listContentEvalJobs,
   listContentEvalQuestions,
@@ -323,7 +430,18 @@ import {
   type ContentEvalJob,
   type ContentEvalSingleResult,
 } from '@/api/contentEvalController'
+import { listModels, type ModelVO } from '@/api/modelController'
+import EvalMultiModelSlots from '@/components/eval/EvalMultiModelSlots.vue'
 import UniEvalTqdmBar from '@/components/UniEvalTqdmBar.vue'
+import JobInterruptedBanner from '@/components/eval/JobInterruptedBanner.vue'
+import JobApiErrorAlert from '@/components/eval/JobApiErrorAlert.vue'
+import JobTokenSummary from '@/components/eval/JobTokenSummary.vue'
+import JobDisplayNameEdit from '@/components/eval/JobDisplayNameEdit.vue'
+import JobProgressActions from '@/components/eval/JobProgressActions.vue'
+import { useEvalJobPoll } from '@/composables/useEvalJobPoll'
+import { useEvalJobControls } from '@/composables/useEvalJobControls'
+import { useEvalBatchUpload } from '@/composables/useEvalBatchUpload'
+import { modelSelectLabel } from '@/utils/modelPlatform'
 
 const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 const emit = defineEmits<{ (e: 'jobs-changed'): void }>()
@@ -333,7 +451,9 @@ const loginUserStore = useLoginUserStore()
 const health = ref<ContentEvalHealth | null>(null)
 const healthLoading = ref(false)
 const activeTab = ref('single')
-const batchMode = ref('multi')
+const batchUpload = useEvalBatchUpload('txt')
+const { multiFileList, dirInputRef, multiFiles, dirFiles, zipFile, dirSelectionHint } = batchUpload
+const maxModelsPerJob = 10
 
 const questionIds = ref<string[]>([])
 const questionsLoading = ref(false)
@@ -345,20 +465,36 @@ const singleFile = ref<File | null>(null)
 const singleLoading = ref(false)
 const singleResult = ref<ContentEvalSingleResult | null>(null)
 
-const multiFiles = ref<File[]>([])
-const multiFileList = ref<UploadProps['fileList']>([])
-const dirFiles = ref<File[]>([])
-const zipFile = ref<File | null>(null)
-const dirInputRef = ref<HTMLInputElement | null>(null)
 const jobLoading = ref(false)
+const multiModelLoading = ref(false)
 const jobId = ref('')
 const jobStatus = ref<ContentEvalJob | null>(null)
+const detailModelFilter = ref<string | undefined>(undefined)
 const recentJobs = ref<ContentEvalJob[]>([])
 const recentJobsLoading = ref(false)
 const loadingJobId = ref('')
 const expandedRowKeys = ref<string[]>([])
-const jobDetailRef = ref<HTMLElement | null>(null)
+const displayName = ref('')
+const evalRounds = ref(1)
+const judgeModel = ref<string>()
+const judgeModels = ref<ModelVO[]>([])
+const judgeModelsLoading = ref(false)
 let pollTimer: ReturnType<typeof setInterval> | null = null
+
+const createMeta = computed(() => ({
+  displayName: displayName.value.trim() || undefined,
+  evalRounds: evalRounds.value,
+  judgeModel: judgeModel.value || undefined,
+}))
+
+const judgeModelOptions = computed(() =>
+  judgeModels.value.map((m) => ({ value: m.id, label: modelSelectLabel(m) })),
+)
+
+const { handlePollTerminal, handlePollCatch } = useEvalJobPoll({
+  completedMessage: '评测完成',
+  onRefreshRecent: () => afterJobCreated(),
+})
 
 const readyForEval = computed(
   () =>
@@ -368,26 +504,65 @@ const readyForEval = computed(
     (!!selectedQuestionId.value || !!singleFile.value),
 )
 
-const batchReady = computed(() => {
-  if (!loginUserStore.loginUser?.id || !health.value?.questionDirOk) return false
-  if (batchMode.value === 'multi') return multiFiles.value.length > 0
-  return dirFiles.value.length > 0 || !!zipFile.value
-})
+function canSubmitBatch(mode: 'multi' | 'dir') {
+  return (
+    !!loginUserStore.loginUser?.id &&
+    !!health.value?.questionDirOk &&
+    batchUpload.batchReady(mode)
+  )
+}
 
 const showProgress = computed(
   () =>
     jobId.value &&
     jobStatus.value &&
-    ['pending', 'running'].includes(jobStatus.value.status),
+    ['pending', 'running', 'paused', 'interrupted', 'completed', 'failed'].includes(jobStatus.value.status),
 )
+
+const isMultiModelJob = computed(
+  () =>
+    jobStatus.value?.jobType === 'multi_model' ||
+    (jobStatus.value?.models?.length ?? 0) > 0,
+)
+
+const compareRows = computed(() => jobStatus.value?.comparison?.byModel ?? [])
+
+const compareColumns = [
+  { title: '模型', dataIndex: 'modelName', width: 160, ellipsis: true },
+  { title: '文件数', dataIndex: 'fileCount', width: 80 },
+  {
+    title: '语法均值',
+    dataIndex: 'grammarMean',
+    width: 100,
+    customRender: ({ text }: { text: number }) => formatScore(text),
+  },
+  {
+    title: '主题均值',
+    dataIndex: 'themeFocusMean',
+    width: 100,
+    customRender: ({ text }: { text: number }) => formatScore(text),
+  },
+  {
+    title: '简洁均值',
+    dataIndex: 'answerClarityMean',
+    width: 100,
+    customRender: ({ text }: { text: number }) => formatScore(text),
+  },
+  {
+    title: '综合均值',
+    dataIndex: 'compositeMean',
+    width: 100,
+    customRender: ({ text }: { text: number }) => formatScore(text),
+  },
+]
 
 const displaySummary = computed(() => jobStatus.value?.summary ?? null)
 
-const tableRows = computed(() => {
-  const rows = jobStatus.value?.perFile ?? []
-  return rows.map((raw, idx) => ({
-    rowKey: `${String(raw.fileName ?? idx)}-${idx}`,
+function mapPerFileRow(raw: Record<string, unknown>, modelName?: string, idx = 0) {
+  return {
+    rowKey: `${modelName || ''}:${String(raw.fileName ?? idx)}-${idx}`,
     fileName: String(raw.fileName ?? ''),
+    modelName: modelName ?? (raw.modelName as string | undefined),
     questionId: String(raw.questionId ?? ''),
     question: String(raw.question ?? ''),
     answer: String(raw.answer ?? ''),
@@ -398,19 +573,60 @@ const tableRows = computed(() => {
     status: String(raw.status ?? 'ok'),
     reason: raw.reason as string | undefined,
     dimensions: raw.dimensions as Record<string, unknown> | undefined,
-  }))
+  }
+}
+
+const tableRows = computed(() => {
+  if (isMultiModelJob.value && jobStatus.value?.models?.length) {
+    const rows: ReturnType<typeof mapPerFileRow>[] = []
+    let idx = 0
+    for (const model of jobStatus.value.models) {
+      for (const row of model.perFile || []) {
+        rows.push(mapPerFileRow(row as Record<string, unknown>, model.modelName, idx++))
+      }
+    }
+    return rows
+  }
+  const rows = jobStatus.value?.perFile ?? []
+  return rows.map((raw, idx) => mapPerFileRow(raw as Record<string, unknown>, undefined, idx))
 })
 
-const columns = [
-  { title: '文件名', dataIndex: 'fileName', width: 160, ellipsis: true },
-  { title: '题目 ID', dataIndex: 'questionId', width: 90 },
-  { title: '语法 (0-100)', dataIndex: 'grammarScore', width: 110 },
-  { title: '主题 (0-4)', dataIndex: 'themeFocusScore', width: 100 },
-  { title: '简洁 (0-3)', dataIndex: 'answerClarityScore', width: 100 },
-  { title: '综合', dataIndex: 'compositeScore', width: 80 },
-  { title: '状态', dataIndex: 'status', width: 80 },
-  { title: '操作', dataIndex: 'action', width: 70, fixed: 'right' as const },
-]
+const modelFilterOptions = computed(() => {
+  const names = new Set<string>()
+  for (const row of tableRows.value) {
+    if (row.modelName) names.add(row.modelName)
+  }
+  return Array.from(names).map((n) => ({ label: n, value: n }))
+})
+
+const filteredTableRows = computed(() => {
+  if (!detailModelFilter.value) return tableRows.value
+  return tableRows.value.filter((r) => r.modelName === detailModelFilter.value)
+})
+
+const detailColumns = computed(() => {
+  type ColDef = {
+    title: string
+    dataIndex: string
+    width?: number
+    ellipsis?: boolean
+    fixed?: 'right'
+  }
+  const cols: ColDef[] = [{ title: '文件名', dataIndex: 'fileName', width: 160, ellipsis: true }]
+  if (isMultiModelJob.value) {
+    cols.push({ title: '模型', dataIndex: 'modelName', width: 140, ellipsis: true })
+  }
+  cols.push(
+    { title: '题目 ID', dataIndex: 'questionId', width: 90 },
+    { title: '语法 (0-100)', dataIndex: 'grammarScore', width: 110 },
+    { title: '主题 (0-4)', dataIndex: 'themeFocusScore', width: 100 },
+    { title: '简洁 (0-3)', dataIndex: 'answerClarityScore', width: 100 },
+    { title: '综合', dataIndex: 'compositeScore', width: 80 },
+    { title: '状态', dataIndex: 'status', width: 80 },
+    { title: '操作', dataIndex: 'action', width: 70, fixed: 'right' },
+  )
+  return cols
+})
 
 function toggleRowExpand(key: string) {
   const i = expandedRowKeys.value.indexOf(key)
@@ -461,8 +677,16 @@ function formatJobId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id
 }
 
+function jobTitle(item: ContentEvalJob) {
+  return item.displayName?.trim() || formatJobId(item.jobId)
+}
+
 function formatJobDescription(item: ContentEvalJob) {
-  const parts = [`${item.totalFiles} 个文件`]
+  const parts: string[] = []
+  if (item.jobType === 'multi_model' && item.modelCount) {
+    parts.push(`${item.modelCount} 模型`)
+  }
+  parts.push(`${item.totalFiles} 个文件`)
   if (item.createdAt) parts.push(item.createdAt)
   if (item.status === 'running' || item.status === 'pending') {
     parts.push(`进度 ${item.progress ?? 0}%`)
@@ -474,11 +698,6 @@ function formatJobDescription(item: ContentEvalJob) {
     parts.push(item.error.slice(0, 40))
   }
   return parts.join(' · ')
-}
-
-async function scrollToJobDetail() {
-  await nextTick()
-  jobDetailRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 function filterQuestion(input: string, option: { value: string }) {
@@ -493,10 +712,23 @@ function requireLogin(): boolean {
   return true
 }
 
+async function loadJudgeModels() {
+  judgeModelsLoading.value = true
+  try {
+    const res = await listModels({ inputModality: 'text' })
+    if (res.data.code === 0) judgeModels.value = res.data.data || []
+  } finally {
+    judgeModelsLoading.value = false
+  }
+}
+
 async function loadHealth() {
   healthLoading.value = true
   try {
     health.value = await getContentEvalHealth()
+    if (health.value?.judgeModel && !judgeModel.value) {
+      judgeModel.value = health.value.judgeModel
+    }
   } catch {
     message.error('无法获取服务状态')
   } finally {
@@ -541,42 +773,15 @@ const onSingleFileBeforeUpload: UploadProps['beforeUpload'] = (file) => {
   return false
 }
 
-const onMultiBeforeUpload: UploadProps['beforeUpload'] = (file) => {
-  const f = file as File
-  if (!f.name.toLowerCase().endsWith('.txt')) {
-    message.warning('仅支持 .txt')
-    return false
-  }
-  multiFiles.value.push(f)
-  multiFileList.value = [
-    ...(multiFileList.value || []),
-    { uid: `${Date.now()}-${f.name}`, name: f.name, status: 'done' },
-  ]
-  return false
-}
-
-const onMultiRemove: UploadProps['onRemove'] = (file) => {
-  const name = file.name
-  multiFiles.value = multiFiles.value.filter((f) => f.name !== name)
-  multiFileList.value = (multiFileList.value || []).filter((f) => f.name !== name)
-}
-
-function pickDirectory() {
-  dirInputRef.value?.click()
-}
-
-function onDirChange(e: Event) {
-  const input = e.target as HTMLInputElement
-  const list = input.files
-  if (!list) return
-  dirFiles.value = Array.from(list).filter((f) => f.name.toLowerCase().endsWith('.txt'))
-  message.info(`已选择 ${dirFiles.value.length} 个 txt 文件`)
-  input.value = ''
-}
-
-const onZipBeforeUpload: UploadProps['beforeUpload'] = (file) => {
-  zipFile.value = file as File
-  return false
+async function submitJob(files: File[], archive?: File) {
+  jobStatus.value = null
+  singleResult.value = null
+  detailModelFilter.value = undefined
+  const id = await createContentEvalJob(files, archive, createMeta.value)
+  jobId.value = id
+  message.success('任务已创建')
+  startPolling(id)
+  await afterJobCreated()
 }
 
 async function runSingle() {
@@ -597,29 +802,47 @@ async function runSingle() {
   }
 }
 
-async function runBatch() {
+async function runBatch(mode: 'multi' | 'dir') {
   if (!requireLogin()) return
-  const files = batchMode.value === 'multi' ? multiFiles.value : dirFiles.value
-  const archive = batchMode.value === 'dir' ? zipFile.value : null
+  if (!health.value?.questionDirOk) {
+    message.warning('题库未就绪，请检查配置后刷新状态')
+    return
+  }
+  const { files, archive } = batchUpload.filesForSubmit(mode)
   if (!files.length && !archive) {
     message.warning('请选择文件或 zip')
     return
   }
   jobLoading.value = true
-  jobStatus.value = null
-  singleResult.value = null
   try {
-    const id = await createContentEvalJob(files, archive ?? undefined)
-    jobId.value = id
-    message.success('任务已创建')
-    activeTab.value = 'batch'
-    startPolling(id)
-    await afterJobCreated()
-    await scrollToJobDetail()
+    await submitJob(files, archive ?? undefined)
   } catch (e: unknown) {
     message.error(e instanceof Error ? e.message : '创建任务失败')
   } finally {
     jobLoading.value = false
+  }
+}
+
+async function runMultiModelBatch(slots: ModelEvalSlot[]) {
+  if (!requireLogin()) return
+  if (!health.value?.questionDirOk) {
+    message.warning('题库未就绪，请检查配置后刷新状态')
+    return
+  }
+  multiModelLoading.value = true
+  jobStatus.value = null
+  singleResult.value = null
+  detailModelFilter.value = undefined
+  try {
+    const id = await createContentMultiModelJob(slots, createMeta.value)
+    jobId.value = id
+    message.success('多模型任务已创建')
+    startPolling(id)
+    await afterJobCreated()
+  } catch (e: unknown) {
+    message.error(e instanceof Error ? e.message : '创建任务失败')
+  } finally {
+    multiModelLoading.value = false
   }
 }
 
@@ -640,16 +863,56 @@ async function pollJob(id: string) {
   try {
     const job = await getContentEvalJob(id)
     jobStatus.value = job
-    if (job.status === 'completed' || job.status === 'failed') {
+    if (
+      job.status === 'completed' ||
+      job.status === 'failed' ||
+      job.status === 'interrupted' ||
+      job.status === 'paused'
+    ) {
       stopPolling()
-      await afterJobCreated()
-      if (job.status === 'completed') message.success('批量评测完成')
-      else message.error(job.error || '任务失败')
+      if (job.status !== 'paused') {
+        handlePollTerminal(job)
+      }
     }
-  } catch {
+  } catch (e: unknown) {
     stopPolling()
+    handlePollCatch(e)
   }
 }
+
+async function saveJobDisplayName(name: string) {
+  if (!jobId.value) return
+  await updateContentEvalJobDisplayName(jobId.value, name)
+  if (jobStatus.value) {
+    jobStatus.value = { ...jobStatus.value, displayName: name }
+  }
+}
+
+function onDisplayNameSaved() {
+  void loadRecentJobs()
+  emit('jobs-changed')
+}
+
+const {
+  pauseLoading,
+  rerunLoading,
+  resumeLoading,
+  handlePause,
+  handleRerun,
+  handleResume,
+} = useEvalJobControls({
+  jobId,
+  resumeJob: resumeContentEvalJob,
+  pauseJob: pauseContentEvalJob,
+  rerunJob: rerunContentEvalJob,
+  startPolling,
+  pollJob,
+  onRefreshRecent: () => {
+    void loadRecentJobs()
+    emit('jobs-changed')
+  },
+  onResumeSuccess: () => afterJobCreated(),
+})
 
 async function loadJob(id: string) {
   if (!requireLogin()) return
@@ -658,7 +921,7 @@ async function loadJob(id: string) {
   jobId.value = id
   singleResult.value = null
   expandedRowKeys.value = []
-  activeTab.value = 'batch'
+  detailModelFilter.value = undefined
   jobStatus.value = null
 
   try {
@@ -667,7 +930,6 @@ async function loadJob(id: string) {
     if (job.status === 'running' || job.status === 'pending') {
       startPolling(id)
     }
-    await scrollToJobDetail()
     if (job.status === 'completed') {
       message.success(`已加载任务（${job.totalFiles} 个文件）`)
     } else if (job.status === 'failed') {
@@ -716,6 +978,7 @@ function downloadFile(content: string, filename: string, mime: string) {
 
 const CSV_HEADERS = [
   'fileName',
+  'modelName',
   'questionId',
   'question',
   'answer',
@@ -730,9 +993,7 @@ const CSV_HEADERS = [
 function rowsToCsv(rows: Array<Record<string, unknown>>) {
   const lines = [
     CSV_HEADERS.join(','),
-    ...rows.map((r) =>
-      CSV_HEADERS.map((h) => JSON.stringify(r[h] ?? '')).join(','),
-    ),
+    ...rows.map((r) => CSV_HEADERS.map((h) => JSON.stringify(r[h] ?? '')).join(',')),
   ]
   return `\uFEFF${lines.join('\n')}`
 }
@@ -753,6 +1014,7 @@ function exportSingleCsv() {
     rowsToCsv([
       {
         fileName: r.fileName,
+        modelName: '',
         questionId: r.questionId,
         question: r.question,
         answer: r.answer ?? '',
@@ -787,6 +1049,36 @@ function exportBatchJson() {
 }
 
 function exportBatchCsv() {
+  if (isMultiModelJob.value && compareRows.value.length) {
+    const summaryHeader = [
+      'modelName',
+      'fileCount',
+      'grammarMean',
+      'themeFocusMean',
+      'answerClarityMean',
+      'compositeMean',
+    ]
+    const detailHeader = [...CSV_HEADERS]
+    const lines = [
+      '# summary',
+      summaryHeader.join(','),
+      ...compareRows.value.map((r) =>
+        summaryHeader.map((h) => JSON.stringify((r as Record<string, unknown>)[h] ?? '')).join(','),
+      ),
+      '',
+      '# detail',
+      detailHeader.join(','),
+      ...tableRows.value.map((r) =>
+        detailHeader.map((h) => JSON.stringify((r as Record<string, unknown>)[h] ?? '')).join(','),
+      ),
+    ]
+    downloadFile(
+      lines.join('\n'),
+      `content-eval-multi-${Date.now()}.csv`,
+      'text/csv;charset=utf-8',
+    )
+    return
+  }
   if (!tableRows.value.length) return
   downloadFile(
     rowsToCsv(tableRows.value as unknown as Array<Record<string, unknown>>),
@@ -799,6 +1091,7 @@ defineExpose({ loadJob })
 
 onMounted(async () => {
   await loadHealth()
+  void loadJudgeModels()
   await loadQuestions()
   if (!props.embedded) await loadRecentJobs()
 })
@@ -903,10 +1196,6 @@ onUnmounted(() => {
   color: #1890ff;
   background: #e6f7ff;
   border-radius: 4px;
-}
-
-.job-detail-section {
-  scroll-margin-top: 80px;
 }
 
 .recent-job-item {

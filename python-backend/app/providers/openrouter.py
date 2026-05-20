@@ -223,6 +223,7 @@ class OpenRouterProvider(ModelProvider):
             "model": vendor_model_id,
             "messages": messages,
             "stream": True,
+            "modalities": ["text"],
             "temperature": temperature,
             "max_tokens": max_tokens,
         }

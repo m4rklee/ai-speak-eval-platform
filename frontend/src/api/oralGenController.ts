@@ -1,4 +1,6 @@
 import request from '@/request'
+import type { EvalJobCommonFields, EvalJobCreateMeta } from '@/types/evalJobCommon'
+import { appendCreateMeta, updateEvalJobDisplayName, pauseEvalJob, rerunEvalJob } from '@/api/evalJobApiHelpers'
 
 type BaseResponse<T = unknown> = {
   code: number
@@ -62,7 +64,12 @@ export type OralGenJob = {
   rows?: OralGenResultRow[]
   createdAt?: string
   finishedAt?: string
-}
+  completedCount?: number
+  totalCount?: number
+  canResume?: boolean
+  interruptedAt?: string
+  hasCheckpoint?: boolean
+} & EvalJobCommonFields
 
 function unwrap<T>(res: { data: BaseResponse<T> }): T {
   const body = res.data
@@ -83,7 +90,7 @@ export type OralGenJobCreateBuiltin = {
   sampleCount?: number
   seed?: number
   requestInterval?: number
-}
+} & EvalJobCreateMeta
 
 export async function createOralGenJobBuiltin(body: OralGenJobCreateBuiltin) {
   const res = await request.post<BaseResponse<string>>('/oral-gen/jobs', {
@@ -97,12 +104,14 @@ export async function createOralGenJobUpload(
   model: string,
   files: File[],
   requestInterval?: number,
+  meta?: EvalJobCreateMeta,
 ) {
   const form = new FormData()
   form.append('model', model)
   if (requestInterval != null) {
     form.append('request_interval', String(requestInterval))
   }
+  appendCreateMeta(form, meta)
   for (const f of files) {
     form.append('files', f)
   }
@@ -121,6 +130,23 @@ export async function getOralGenJob(jobId: string) {
 export async function listOralGenJobs() {
   const res = await request.get<BaseResponse<{ jobs: OralGenJob[] }>>('/oral-gen/jobs')
   return unwrap(res)
+}
+
+export async function resumeOralGenJob(jobId: string) {
+  const res = await request.post<BaseResponse<null>>(`/oral-gen/jobs/${jobId}/resume`)
+  return unwrap(res)
+}
+
+export async function updateOralGenJobDisplayName(jobId: string, displayName: string) {
+  return updateEvalJobDisplayName('oral-gen', jobId, displayName)
+}
+
+export async function pauseOralGenJob(jobId: string) {
+  return pauseEvalJob('oral-gen', jobId)
+}
+
+export async function rerunOralGenJob(jobId: string) {
+  return rerunEvalJob('oral-gen', jobId)
 }
 
 export function oralGenAudioUrl(jobId: string, stem: string) {
