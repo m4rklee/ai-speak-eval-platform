@@ -46,7 +46,7 @@ MySQL / Redis / external model APIs
 - **前端**: Vue 3, TypeScript, Vite, Pinia, Ant Design Vue
 - **后端**: Python, FastAPI-style service structure
 - **数据库**: MySQL, Redis
-- 
+  
 ## 快速开始
 
 ```bash
