@@ -1,110 +1,132 @@
-# 面向口语练习场景的大模型评测平台
+# AI Speak Eval Platform
 
-> 面向口语练习与模型选型的一站式评测系统：统一评测标准、多维打分、多模型横向对比。
+> A web-based evaluation platform for spoken-language practice models, speech scoring, listening tasks, and multi-model comparison.
 
----
+AI Speak Eval Platform 是一个面向口语练习与模型选型的一站式评测系统。项目将数据集建设、评测维度设计、模型调用、批量任务、结果分析和报告导出收敛到同一 Web 产品，用于对比不同模型在口语、听力和内容生成场景中的表现。
 
-## 背景 📖
+## Highlights
 
-大模型越来越多地用于口语练习与教学，但常见痛点是：
+- **Unified evaluation workflow**: 统一口语、听力、内容质量和多模型对比流程。
+- **Multi-dimensional scoring**: 覆盖发音、流利度、自然度、语法、主题聚焦、回答简洁和听力理解。
+- **Batch model evaluation**: 支持批量评测、进度跟踪和结果导出。
+- **Model library**: 对接 AiHubMix、OpenRouter 等平台，按模态、价格和能力筛选模型。
+- **Prompt experiments**: 支持围绕口语练习任务进行 prompt 与模型效果对比。
+- **Frontend + backend separation**: Vue 3 前端与 Python backend 分离，便于迭代。
 
-- **标准不统一**：不同实验难以在同一套尺度上对比；
-- **能力难横向比**：语音、内容、听力往往分散在表格和临时脚本里；
-- **链路太长**：从出题、调用模型到出报告，重复搭建成本高。
+## Background
 
-本项目将 **数据集建设、评测维度设计、模型调用与结果分析** 收敛到同一 Web 产品。
+大模型越来越多地用于口语练习与教学，但常见痛点包括：
 
-### 建设亮点
+- 不同实验评测标准不统一，难以横向比较。
+- 语音、内容、听力评测常分散在临时脚本和表格中。
+- 从出题、调用模型到生成报告的链路重复搭建成本高。
 
-| 方向 | 说明 |
-|------|------|
-| **平台规划** | 从 0 到 1 落地口语、听力、模型库、多模型对比、Prompt 实验等模块 |
-| **评测维度** | 发音、流利、自然度、语法、主题聚焦、回答简洁、听力理解等；结合专用语音模型与大模型 Judge |
-| **数据建设** | 公开数据 **3000+ 条**；约 **40%** 音频合成增强发音与流利度档位；**200 条** 真实对话补充 |
-| **模型整合** | 接入 AiHubMix、OpenRouter，支持批量评测、进度跟踪与报告导出 |
-| **完整链路** | 题目音频 → 模型生成回答 → 语音 + 内容综合评测，支持分步或一站式流水线 |
+本项目通过平台化方式沉淀评测数据、模型结果和分析报告。
 
-### 评测体系与数据
-
-- **语音侧**：发音准确性、流利度、韵律与自然度  
-- **内容侧**：语法、主题聚焦、回答简洁清晰  
-- **听力侧**：听音理解准确率  
-- **综合**：同一作答同时输出语音与内容评价  
-
-技术栈：Vue 3 + FastAPI + MySQL + Redis；语音评测对接 MultiPA、APG-MOS 等。更细的架构见 [`PROJECT.md`](PROJECT.md)。
-
----
-
-## 功能 ✨
-
-| 模块 | 说明 |
-|------|------|
-| 🎙️ **口语评测** | 回复生成、语音评测、内容评测、综合评测与一站式流水线 |
-| 🎧 **听力评测** | 听音选题、准确率统计、抽题与结果导出 |
-| 📚 **模型库** | 双平台模型同步，按模态、价格等筛选 |
-| ⚖️ **模型对比** | 多模型并排生成，支持人工偏好与横向比较 |
-| 🧪 **Prompt Lab** | 单模型多提示词变体对比与实验记录 |
-| 🗂️ **场景管理** | 系统预设 + 自定义场景，支持 JSON 导入题目 |
-| 👥 **用户管理** | 多用户与管理员权限 |
-
-**典型流程**
+## Architecture
 
 ```text
-题目音频 → 模型生成回答 → 语音与内容维度评分 → 对比表 / 导出报告
+Vue 3 Frontend
+      |
+      v
+Python Backend
+      |
+      +--> scenario and dataset management
+      +--> model provider adapters
+      +--> speech evaluation
+      +--> content evaluation
+      +--> batch jobs
+      +--> report export
+      |
+      v
+MySQL / Redis / external model APIs
 ```
 
----
+更详细的系统设计见 [PROJECT.md](PROJECT.md)。
 
-## 用法 🚀
+## Features
 
-### 环境要求 🛠️
+| Module | Description |
+|---|---|
+| **Speaking Evaluation** | 回复生成、语音评测、内容评测、综合评测与一站式流水线。 |
+| **Listening Evaluation** | 听音选题、准确率统计、抽题与结果导出。 |
+| **Model Library** | 双平台模型同步，按模态、价格、上下文等维度筛选。 |
+| **Model Comparison** | 多模型并排生成，支持人工偏好与横向比较。 |
+| **Batch Jobs** | 批量调用模型并追踪评测进度。 |
+| **Report Export** | 对评测结果做统计分析和导出。 |
 
-- Python 3.10+、Node.js 18+
-- MySQL、Redis
-- 口语 **语音评测** 需本机启动 MultiPA / APG-MOS（`scripts/eval-daemons.sh`）
+## Tech Stack
 
-### 克隆与依赖 📦
+- **Frontend**: Vue 3, TypeScript, Vite, Pinia, Ant Design Vue
+- **Backend**: Python, FastAPI-style service structure
+- **Database**: MySQL, Redis
+- **Model Providers**: AiHubMix, OpenRouter and compatible APIs
+- **Speech Evaluation**: MultiPA, APG-MOS and related scoring services
+- **Tooling**: SQL migrations, shell scripts, OpenAPI type generation
+
+## Quick Start
 
 ```bash
 git clone https://github.com/m4rklee/ai-speak-eval-platform.git
 cd ai-speak-eval-platform
-
-cd python-backend && pip install -r requirements.txt && cp .env.example .env
-cd ../frontend && npm install
 ```
 
-### 数据库与本地数据 🗄️
+Frontend:
 
 ```bash
-# 项目根目录
-mysql -u root -p < sql/create_table.sql
+cd frontend
+npm install
+npm run dev
 ```
 
-评测数据 **不随仓库发布**，请本地准备：
-
-- 内容评测：将 `*.txt` 放入 `data/questiontext/`
-- 听力评测：在 `.env` 中设置 `LISTEN_EVAL_PACKAGE_DIR`
-
-详见 [`data/README.md`](data/README.md)。
-
-### 配置与启动 ▶️
-
-编辑 `python-backend/.env`（API Key、数据库、Redis、代理等，见 `.env.example`），然后：
+Backend:
 
 ```bash
-# 项目根目录：启动 MariaDB/Redis、前后端与评测 daemon
-bash scripts/restart-dev.sh all
+cd python-backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
 ```
 
-| 服务 | 地址 |
-|------|------|
-| 前端 | http://localhost:6006 |
-| 后端 | http://localhost:6008 |
-| 健康检查 | http://localhost:6008/api/health |
+启动依赖和开发服务可参考：
 
-### 登录使用 👤
+```text
+scripts/ensure-infra.sh
+scripts/restart-dev.sh
+scripts/eval-daemons.sh
+```
 
-1. 浏览器打开前端，注册或使用 `sql/create_table.sql` 中的种子账号登录  
-2. 在 **模型库** 同步模型后，进入各评测页提交任务  
-3. 管理员可进入 **用户管理**  
+## Usage
 
+典型流程：
+
+1. 在模型库同步并配置待评测模型。
+2. 创建口语或听力评测场景。
+3. 导入题目、音频或模型输出。
+4. 启动批量评测任务。
+5. 查看多维评分、横向对比和导出结果。
+
+## Project Structure
+
+```text
+frontend/                # Vue 3 web frontend
+python-backend/          # Python backend service
+sql/                     # Database schema and migrations
+scripts/                 # Dev, infra and evaluation scripts
+data/                    # Dataset notes
+PROJECT.md               # Architecture and project notes
+```
+
+## Notes
+
+- 不同语音评分模型和大模型 judge 的尺度可能不一致，需要结合人工抽检校准。
+- 真实业务使用前应明确数据授权、音频隐私和模型调用成本。
+- 部分外部模型平台需要单独配置 API Key。
+
+## Roadmap
+
+- Add more reproducible public benchmark subsets.
+- Improve scoring calibration and human review workflow.
+- Add dashboard-level model ranking reports.
+- Add deployment guide for long-running evaluation jobs.
